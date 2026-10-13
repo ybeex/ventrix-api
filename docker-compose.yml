@@ -1,0 +1,39 @@
+# Local development: `docker compose up -d` (datastores only), then `npm run db:migrate && npm run dev` (+ `npm run dev:worker`).
+# Full stack in containers:  docker compose --profile app up --build
+services:
+  postgres:
+    image: postgres:16
+    environment: { POSTGRES_USER: storekeeper, POSTGRES_PASSWORD: storekeeper, POSTGRES_DB: storekeeper }
+    ports: ["5432:5432"]
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    healthcheck: { test: ["CMD-SHELL", "pg_isready -U storekeeper"], interval: 5s, retries: 10 }
+  redis:
+    image: redis:7
+    ports: ["6379:6379"]
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]   # noeviction: BullMQ must never lose jobs to eviction
+    healthcheck: { test: ["CMD", "redis-cli", "ping"], interval: 5s, retries: 10 }
+
+  migrate:
+    profiles: [app]
+    build: .
+    command: ["node", "dist/scripts/migrate.js"]
+    environment: &env
+      NODE_ENV: development
+      DATABASE_URL: postgres://storekeeper:storekeeper@postgres:5432/storekeeper
+      REDIS_URL: redis://redis:6379
+    depends_on: { postgres: { condition: service_healthy } }
+  api:
+    profiles: [app]
+    build: .
+    command: ["node", "dist/src/server.js"]
+    environment: *env
+    ports: ["3000:3000"]
+    depends_on: { migrate: { condition: service_completed_successfully }, redis: { condition: service_healthy } }
+  worker:
+    profiles: [app]
+    build: .
+    command: ["node", "dist/src/worker.js"]      # same image, different process: scale independently of the API
+    environment: *env
+    depends_on: { migrate: { condition: service_completed_successfully }, redis: { condition: service_healthy } }
+volumes:
+  pgdata:
