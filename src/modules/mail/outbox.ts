@@ -29,20 +29,25 @@ export async function enqueueEmail(
 export interface DispatchResult { sent: number; failed: number; deferred: number }
 
 export async function dispatchDueEmails(db: Db, batch = 20): Promise<DispatchResult> {
+  // UPDATE … RETURNING does not preserve the subquery's ORDER BY (it follows physical heap order, which churn scrambles), so the
+  // claim carries each row's due time out and the final SELECT sorts: a superseded invite/reset link must never be sent AFTER its replacement.
   const claimed = await db.execute<{
     id: string; to_email: string; subject: string; text_body: string; html_body: string | null; attempts: number;
   }>(sql`
-    update email_outbox set
-      next_attempt_at = now() + make_interval(secs => ${CLAIM_VISIBILITY_SECONDS}),
-      attempts = attempts + 1
-    where id in (
-      select id from email_outbox
+    with due as (
+      select id, next_attempt_at as was_due, created_at as was_created from email_outbox
       where status = 'pending' and next_attempt_at <= now()
-      order by next_attempt_at
+      order by next_attempt_at, created_at, id
       limit ${batch}
       for update skip locked
+    ), claimed as (
+      update email_outbox e set
+        next_attempt_at = now() + make_interval(secs => ${CLAIM_VISIBILITY_SECONDS}),
+        attempts = e.attempts + 1
+      from due where e.id = due.id
+      returning e.id, e.to_email, e.subject, e.text_body, e.html_body, e.attempts, due.was_due, due.was_created
     )
-    returning id, to_email, subject, text_body, html_body, attempts
+    select id, to_email, subject, text_body, html_body, attempts from claimed order by was_due, was_created, id
   `);
   const rows = Array.isArray(claimed) ? claimed : (claimed as unknown as { rows: typeof claimed }).rows;
 
