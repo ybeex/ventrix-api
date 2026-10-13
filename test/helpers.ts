@@ -125,3 +125,13 @@ export const dbMessage = (e: unknown): string => {
   return parts.join(' | ');
 };
 export const rejectsDb = (p: Promise<unknown>, re: RegExp, _why?: string) => assert.rejects(p, (e) => { assert.match(dbMessage(e), re); return true; });
+
+import { and, asc, eq } from 'drizzle-orm';
+import { auditEvents } from '../src/db/schema.js';
+/** All audit rows for an org (optionally one action), oldest first. */
+export async function auditRows(orgId: string, action?: string) {
+  return db.select().from(auditEvents)
+    .where(action ? and(eq(auditEvents.orgId, orgId), eq(auditEvents.action, action)) : eq(auditEvents.orgId, orgId))
+    .orderBy(asc(auditEvents.seq));
+}
+export const auditCount = async (orgId: string, action?: string) => (await auditRows(orgId, action)).length;
