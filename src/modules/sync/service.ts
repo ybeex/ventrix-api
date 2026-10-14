@@ -17,7 +17,7 @@ import { categories, holders, items, jobs, locations, shelves, syncIssues, users
 import type { Actor } from '../../lib/actor.js';
 import { bodyAjv } from '../../lib/ajv.js';
 import { audit } from '../../lib/audit.js';
-import { AppError, ConflictError, NotFoundError, ValidationError } from '../../lib/errors.js';
+import { AppError, ConflictError, NotFoundError, UnprocessableError, ValidationError } from '../../lib/errors.js';
 import { emitEvent } from '../../lib/events.js';
 import { metrics } from '../../lib/metrics.js';
 import { keysetWhere, toPage } from '../../lib/pagination.js';
@@ -137,6 +137,8 @@ export async function resolveIssue(db: Db, reviewer: Actor, id: string, input: {
   let txId: string | null = null;
   let status: 'resolved_kept_server' | 'resolved_applied_client' = 'resolved_kept_server';
   if (input.resolution === 'apply_client') {
+    // A REJECTED action was malformed (e.g. a non-uuid item id): there is nothing valid to replay, and replaying it would hit the database with garbage.
+    if (issue.kind === 'rejected') throw new UnprocessableError('NOT_REPLAYABLE', 'This action was rejected as invalid and cannot be applied; keep the server state to dismiss it');
     // Re-attempt as the ORIGINAL person (the ledger must name who actually did it, not the reviewer). Still subject to every rule:
     // if the world still forbids it the reviewer gets the same conflict back and the issue stays open.
     const [u] = await db.select().from(users).where(and(eq(users.id, issue.actorUserId), eq(users.orgId, reviewer.orgId))).limit(1);

@@ -44,7 +44,7 @@ owner and deliberately not changed. Every defect has a regression test.
 | B10 | Production dependencies had 5 advisories (nodemailer high ×2, drizzle-orm high, csv-parse, swagger-ui→@fastify/static). | Upgraded to patched majors; swagger moved to dev-only dynamic import. 0 advisories. | CI `npm run audit` |
 | B11 | `incident`/approval defaults: low-stock event fired for items *created* below minimum — judged correct (fires on downward crossing); documented rather than changed. | Documented in DECISIONS.md. | `notifications` |
 
-## C. Defects found while adding the governance test suites (WS1)
+## C. Defects found while adding the governance and UI-contract test suites (WS1, WS4)
 
 | # | Before | After | Test |
 |---|---|---|---|
@@ -52,6 +52,7 @@ owner and deliberately not changed. Every defect has a regression test.
 | C2 | Activity sentences for report views read "viewed the **a** report": the report name is the audit row's `entityId`, which was never resolved. | A report's id is used as its name. | `activity.test.ts` summaries |
 | C3 | `session.revoked` sentences never said whose session ("X signed out a session") because the formatter read a field that is never written. | Uses `own` / `allDevices` / `sessions` and the target's name: "signed out one of their own devices" / "signed out Stella Staff everywhere (3 sessions)". | `activity.test.ts` session test |
 | C4 | The fallback sentence for an unregistered audit action printed the raw key (`legacy.thing_happened`). | Humanised label; category "Other"; never an error. | `activity.test.ts` fallback test |
+| C5 | Resolving a **rejected** (malformed) sync issue with `apply_client` replayed the garbage payload into the database and returned **500** (`INTERNAL_ERROR`). Found by the offline round-trip contract test. | A rejected action is not replayable: 422 `NOT_REPLAYABLE`, the issue stays open, `keep_server` dismisses it. | `sync.test.ts` REGRESSION (fails on the old code) |
 
 Verified by deliberately breaking behaviour and watching a test fail: FIFO comparison (`>`→`>=`), FIFO order, near-band boundary (`<=`→`<`), supervisor invite matrix, `supervisorsCanInvite`, lockout-once, the migration default, and one audit action name.
 
@@ -61,3 +62,5 @@ Verified by deliberately breaking behaviour and watching a test fail: FIFO compa
 |---|---|---|---|
 | D1 | Closing a **shelf** count with zero items counted still resets that shelf's cycle-count clock, so reminders can be silenced with an empty count. | Require ≥1 count / all expected items / a configurable percentage before the clock resets. | `cycle-counts.test.ts` "documented behaviour…" |
 | D2 | A supervisor acting on an admin-role invitation gets 403, revealing the user id exists; the code comment intends 404. | Check visibility before permission (404), at the cost of a slightly less helpful message. | `invites.test.ts` |
+| D3 | Any role (including viewers) can read a reconciliation's counts and system quantities (`reconciliation:read` = every role); DECISIONS #6 had implied admin + supervisor only. | Keep (transparency for the floor) or restrict reading to reviewers. | `ui-contract.test.ts` count test |
+| D4 | Item-scoped timeline summaries say "an item" ("Stella checked out an item to John") because the item is implicit on that screen; the batch response and activity feed name it. | Pass the item name into item-timeline summaries, or leave it to the client to compose. | probe in WS4; `docs/FRONTEND-INTEGRATION.md` §8 |
