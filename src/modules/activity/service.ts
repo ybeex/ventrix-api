@@ -53,7 +53,7 @@ export async function listActivity(db: Db, orgId: string, f: ActivityFilters) {
 
   return {
     items: page.items.map(({ e, actorName }) => {
-      const entityName = names.get(`${e.entityType}:${e.entityId}`) ?? null;
+      const entityName = names.get(`${e.entityType}:${e.entityId}`) ?? (e.entityType === 'report' ? e.entityId : null); // a report's id IS its name ("inventory")
       const tx = e.transactionId ? txById.get(e.transactionId) : undefined;
       const summary = tx && e.action.startsWith('transaction.')
         ? summarizeTx(tx.t, { actor: actorName, item: entityName, holder: tx.holderName })

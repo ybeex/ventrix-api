@@ -6,3 +6,4 @@ dist
 .storage
 coverage
 *.log
+dump.rdb

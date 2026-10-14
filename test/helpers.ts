@@ -61,7 +61,8 @@ export async function createUser(app: App, admin: Session, role: 'admin' | 'supe
 
 export const lastMailTo = (email: string) => [...sentMessages].reverse().find((m) => m.to === email);
 export const tokenFromMail = (email: string) => /token=([A-Za-z0-9_-]+)/.exec(lastMailTo(email)!.text)![1];
-export async function flushMail() { await dispatchDueEmails(db); }
+/** Drains the outbox completely (dispatchDueEmails sends at most one batch of 20 per call). */
+export async function flushMail() { for (let i = 0; i < 50; i++) { const r = await dispatchDueEmails(db); if (r.sent + r.failed + r.deferred === 0) break; } }
 
 /** Minimal valid 1×1 PNG. */
 export const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
@@ -125,3 +126,13 @@ export const dbMessage = (e: unknown): string => {
   return parts.join(' | ');
 };
 export const rejectsDb = (p: Promise<unknown>, re: RegExp, _why?: string) => assert.rejects(p, (e) => { assert.match(dbMessage(e), re); return true; });
+
+import { and, asc, eq } from 'drizzle-orm';
+import { auditEvents } from '../src/db/schema.js';
+/** All audit rows for an org (optionally one action), oldest first. */
+export async function auditRows(orgId: string, action?: string) {
+  return db.select().from(auditEvents)
+    .where(action ? and(eq(auditEvents.orgId, orgId), eq(auditEvents.action, action)) : eq(auditEvents.orgId, orgId))
+    .orderBy(asc(auditEvents.seq));
+}
+export const auditCount = async (orgId: string, action?: string) => (await auditRows(orgId, action)).length;

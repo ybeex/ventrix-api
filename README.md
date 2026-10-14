@@ -10,7 +10,8 @@ works offline, and is safe to retry.
 
 | PRD | Capability | Module |
 |---|---|---|
-| §6–7, §22 | Items (tracked assets & consumables), categories, human Item IDs, QR, CSV import | `items` `categories` `imports` |
+| §6–7, §22 | Items (tracked assets & consumables), human Item IDs, QR, CSV import | `items` `imports` |
+| shelf system | Shelves → categories → items (mandatory chain; a location holds shelves), scan lookup, per-shelf cycle-count interval, **Collections** overview | `shelves` `categories` `operations` |
 | §8–10 | Holders (people need no login), teams, departments, sites; locations; jobs | `holders` `locations` `jobs` |
 | §11–17 | Checkout (single/batch), check-in, consume, restock, loss, damage, condition/state | `transactions` |
 | §18, §32 | Adjustments & approvals (policy by role / threshold / operation) | `transactions` `approvals` |
@@ -19,12 +20,13 @@ works offline, and is safe to retry.
 | §23 | Photos & transaction snapshots (private storage, signed URLs) | `files` |
 | §24, §50 | Immutable ledger + audit log; corrections by reversal rows | `transactions` `activity` |
 | §25–28 | Timeline, outstanding, overdue, low stock, dashboard | `items` `operations` |
-| §30 | Notifications (in-app + e-mail), preferences | `notifications` `mail` |
-| §31, §37 | Roles/permissions, sessions, PIN quick-switch for shared devices, tenant isolation | `identity` |
+| §30 | Notifications (in-app + e-mail), preferences, **org-wide role routing per type**, cycle-count reminders | `notifications` `mail` |
+| governance | **Announcements** (role audience, e-mail, retract), **activity feed** with human sentences + category filters | `notifications` `activity` |
+| §31, §37 | Roles/permissions, **session management**, **role-based invites** (matrix, bulk, resend, revoke), PIN quick-switch for shared devices, tenant isolation | `identity` |
 | §40 | Reports (inventory, outstanding, low stock, transactions, discrepancies) + CSV | `reports` |
 | §39, §55 | Metrics, health, readiness | `plugins/observability` |
 
-104 HTTP operations; the full contract is [`docs/openapi.json`](docs/openapi.json) (generated from the live schemas, `npm run openapi`).
+132 HTTP operations; the full contract is [`docs/openapi.json`](docs/openapi.json) (generated from the live schemas, `npm run openapi`).
 
 ## Architecture in one page
 
@@ -78,7 +80,7 @@ src/lib/                         errors, pagination, idempotency, permissions, c
 src/plugins/                     perimeter security, auth, access (fail-closed), errors, observability
 src/modules/<name>/              one folder per bounded module: service.ts · routes.ts (· queries.ts · schemas.ts)
 drizzle/                         generated migrations + manual/{pre,post}/ SQL (extensions, immutability triggers)
-test/                            140+ integration tests against real Postgres and Redis
+test/                            360+ integration tests against real Postgres and Redis
 docs/                            DECISIONS · SECURITY · OPERATIONS · AUDIT-FINDINGS · openapi.json
 ```
 
@@ -86,11 +88,11 @@ docs/                            DECISIONS · SECURITY · OPERATIONS · AUDIT-FI
 
 `npm test` runs integration tests against **real** Postgres and Redis (no mocks): the 25-way oversell race, duplicate-key
 races, approval races, offline replay, tenant isolation on every module, an exhaustive route-by-route access audit,
-perimeter security, and an end-to-end BullMQ worker run. After scenarios, the integrity oracle recomputes balances,
+perimeter security, an end-to-end BullMQ worker run, **a route-by-route audit-coverage test (every mutating endpoint must leave an audit row or be explicitly allowlisted)**, and a migration test that applies `0003` to a populated database. After scenarios, the integrity oracle recomputes balances,
 custody and state chains from the ledger alone.
 
 ## Branching
 
 `main` (initial commit) ← `develop` ← feature branches (`feat/foundation`, `identity`, `catalog`, `transactions`,
-`operations`, `reconciliation`, `imports`, `sync`, `notifications`, `hardening`), each merged with `--no-ff` after its tests passed.
+`operations`, `reconciliation`, `imports`, `sync`, `notifications`, `hardening`, `shelves`, `governance`), each merged with `--no-ff` after its tests passed.
 `chore/baseline-starter` holds the untouched reference starter this was built from, so every change is a readable diff.

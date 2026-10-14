@@ -1,8 +1,9 @@
 # Findings: before → after
 
-Two sources: **(A)** defects in the reference starter (`chore/baseline-starter`), found by reading it against the
-backlog and PRD before building on it; **(B)** defects introduced or exposed during this build and caught by the
-test suite. Each has a regression test.
+Four sections: **(A)** defects in the reference starter (`chore/baseline-starter`), found by reading it against the
+backlog and PRD before building on it; **(B)** defects introduced or exposed during the first build and caught by the
+test suite; **(C)** defects found while adding the governance test suites; **(D)** open questions flagged for the product
+owner and deliberately not changed. Every defect has a regression test.
 
 ## A. Starter defects
 
@@ -42,3 +43,21 @@ test suite. Each has a regression test.
 | B9 | Fastify accepted `text/plain` JSON-ish bodies. | JSON-only; other types → 415. | `security` |
 | B10 | Production dependencies had 5 advisories (nodemailer high ×2, drizzle-orm high, csv-parse, swagger-ui→@fastify/static). | Upgraded to patched majors; swagger moved to dev-only dynamic import. 0 advisories. | CI `npm run audit` |
 | B11 | `incident`/approval defaults: low-stock event fired for items *created* below minimum — judged correct (fires on downward crossing); documented rather than changed. | Documented in DECISIONS.md. | `notifications` |
+
+## C. Defects found while adding the governance test suites (WS1)
+
+| # | Before | After | Test |
+|---|---|---|---|
+| C1 | The e-mail outbox claimed rows with `UPDATE … RETURNING`, which does **not** preserve the subquery's `ORDER BY`. Under row churn (retries/backoff) mails were sent in heap order — a superseded invite or reset link could be delivered *after* its replacement (18 of 20 trials inverted). Surfaced as an intermittent failure in the re-invite test. | The claim is a CTE that carries each row's due time out; the final `SELECT` orders by it. | `outbox.test.ts` (fails on the old code) |
+| C2 | Activity sentences for report views read "viewed the **a** report": the report name is the audit row's `entityId`, which was never resolved. | A report's id is used as its name. | `activity.test.ts` summaries |
+| C3 | `session.revoked` sentences never said whose session ("X signed out a session") because the formatter read a field that is never written. | Uses `own` / `allDevices` / `sessions` and the target's name: "signed out one of their own devices" / "signed out Stella Staff everywhere (3 sessions)". | `activity.test.ts` session test |
+| C4 | The fallback sentence for an unregistered audit action printed the raw key (`legacy.thing_happened`). | Humanised label; category "Other"; never an error. | `activity.test.ts` fallback test |
+
+Verified by deliberately breaking behaviour and watching a test fail: FIFO comparison (`>`→`>=`), FIFO order, near-band boundary (`<=`→`<`), supervisor invite matrix, `supervisorsCanInvite`, lockout-once, the migration default, and one audit action name.
+
+## D. Open questions (flagged, not changed)
+
+| # | Observation | Options | Pinned by |
+|---|---|---|---|
+| D1 | Closing a **shelf** count with zero items counted still resets that shelf's cycle-count clock, so reminders can be silenced with an empty count. | Require ≥1 count / all expected items / a configurable percentage before the clock resets. | `cycle-counts.test.ts` "documented behaviour…" |
+| D2 | A supervisor acting on an admin-role invitation gets 403, revealing the user id exists; the code comment intends 404. | Check visibility before permission (404), at the cost of a slightly less helpful message. | `invites.test.ts` |
