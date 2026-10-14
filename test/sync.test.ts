@@ -242,3 +242,15 @@ test('metrics: sync outcomes are exported (applied / replayed / conflict / rejec
   for (const o of ['applied', 'replayed', 'conflict', 'rejected']) assert.match(body, new RegExp(`storekeeper_sync_actions_total\\{outcome="${o}"\\}`), o);
   void callIdem;
 });
+
+test('REGRESSION: apply_client on a REJECTED (malformed) issue is a clear 422, never a 500, and the issue stays open; keep_server still closes it', async () => {
+  const org = await registerOrg(app); const staff = await createUser(app, org, 'store_staff'); const sup = await createUser(app, org, 'supervisor');
+  const r = await call(app, staff.token, 'POST', '/sync/batch', { deviceId: 'tablet-77', actions: [{ clientGeneratedId: 'client-bad-0001', type: 'consume', queuedAt: new Date().toISOString(), payload: { itemId: 'not-a-uuid', quantity: 1 } }] });
+  assert.equal(r.json().results[0].status, 'rejected');
+  const issue = (await call(app, sup.token, 'GET', '/sync/conflicts')).json().items.find((i: any) => i.kind === 'rejected');
+  const bad = await callIdem(app, sup.token, 'POST', `/sync/conflicts/${issue.id}/resolve`, { resolution: 'apply_client', note: 'try it anyway' });
+  assert.equal(bad.statusCode, 422, bad.body); assert.equal(bad.json().error.code, 'NOT_REPLAYABLE');
+  assert.equal((await call(app, sup.token, 'GET', '/sync/conflicts')).json().items.find((i: any) => i.id === issue.id).status, 'open');
+  const ok = await callIdem(app, sup.token, 'POST', `/sync/conflicts/${issue.id}/resolve`, { resolution: 'keep_server', note: 'discard' });
+  assert.equal(ok.statusCode, 200); assert.equal(ok.json().status, 'resolved_kept_server');
+});
