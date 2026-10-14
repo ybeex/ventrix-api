@@ -77,7 +77,7 @@ test('closing a SHELF count resets the clock; the next reminder comes one full i
   assert.equal(await scanCycleCounts(db), 1, 'a new cycle has elapsed');
   const ev = await events(); assert.equal(ev.length, 2); assert.notEqual(ev[1].dedupe_key, firstKey); assert.ok(ev[1].payload.lastCountedAt);
   await processDomainEvents(db);
-  const n = await noteTo(admin); assert.match(n[0].body, /last counted \d{4}-\d{2}-\d{2}/);
+  const n = await noteTo(admin); assert.equal(n.length, 2); assert.ok(n.some((x) => /never counted/.test(x.body))); assert.ok(n.some((x) => /last counted \d{4}-\d{2}-\d{2}/.test(x.body)), 'the second reminder names the last count date');
 });
 
 test('only CLOSED SHELF-scope counts reset the clock: open shelf counts, category counts and item counts do not', async () => {
