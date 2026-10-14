@@ -2,7 +2,7 @@
  * Plain-language sentences for the Activity feed and item timelines ("Ben checked out Angle grinder 12 to Electrical team").
  * Pure functions: the same ledger row always reads the same way, on every surface (API, CSV, notifications).
  */
-import { AUDIT_ACTIONS } from './audit-catalog.js';
+import { AUDIT_ACTIONS, humanizeAction } from './audit-catalog.js';
 
 const STATE: Record<string, string> = { available: 'available', checked_out: 'checked out', lost: 'lost', damaged: 'damaged', under_repair: 'under repair', retired: 'retired' };
 const REASON: Record<string, string> = { count_correction: 'count correction', opening_balance_correction: 'opening balance correction', unrecorded_movement: 'unrecorded movement', damage: 'damage', loss: 'loss', other: 'other' };
@@ -64,7 +64,7 @@ export function summarizeAudit(e: AuditFacts, w: AuditWho): string {
     case 'auth.pin_failed': return `Failed PIN attempt${ent ? ` for ${ent}` : ''}`;
     case 'auth.password_reset_requested': return `A password reset was requested${ent ? ` for ${ent}` : ''}`;
     case 'access.denied': return `${a} was refused access to ${e.next?.permission ? `"${n.permission}"` : 'a protected action'}`;
-    case 'session.revoked': return `${a} signed out ${n.target ? `${n.target}` : 'a session'}${n.sessions ? ` (${n.sessions} session${n.sessions === 1 ? '' : 's'})` : ''}`;
+    case 'session.revoked': return n.own ? `${a} signed out one of their own devices` : n.allDevices ? `${a} signed out ${ent ?? 'a user'} everywhere (${n.sessions ?? 0} session${n.sessions === 1 ? '' : 's'})` : `${a} signed out a session of ${ent ?? 'a user'}`;
     case 'shelf.created': return `${a} created shelf ${n.name ?? ent ?? ''}`.trim();
     case 'shelf.updated': return `${a} edited shelf ${ent ?? n.name ?? ''}${n.itemsRelocated ? ` and relocated ${n.itemsRelocated} items` : ''}`.trim();
     case 'shelf.archived': return `${a} archived shelf ${ent ?? p.name ?? ''}`.trim();
@@ -106,6 +106,6 @@ export function summarizeAudit(e: AuditFacts, w: AuditWho): string {
     case 'report.viewed': return `${a} viewed the ${ent ?? 'a'} report`;
     case 'report.exported': return `${a} exported the ${ent ?? ''} report`.replace('  ', ' ');
     case 'activity.viewed': return `${a} viewed the activity log`;
-    default: return `${a}: ${AUDIT_ACTIONS[e.action]?.label ?? e.action}${ent ? ` — ${ent}` : ''}`;
+    default: return `${a}: ${AUDIT_ACTIONS[e.action]?.label ?? humanizeAction(e.action)}${ent ? ` — ${ent}` : ''}`;
   }
 }
