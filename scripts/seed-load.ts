@@ -14,6 +14,8 @@
  *   SEED_ASSET_EVENTS=40     ledger rows per asset (create, then checkout / check-in pairs; odd/even decides the final state)
  *   SEED_SHELVES=20 SEED_CATS_PER_SHELF=10 SEED_HOLDERS=2000   structure (only created on the first run)
  *   SEED_AUDIT_RATIO=4       one audit row per N ledger rows
+ *   SEED_PROFILE=heavy|real  heavy (default): every consumable ends with units out (stress); real: check-ins return in full, ~2% of consumables
+ *                            and ~4% of assets are outstanding — what a working crib looks like
  *
  * Shape guarantees (what makes `findViolations` pass): quantity_available = Σ stock_delta; balance_before/after chain per item;
  * custody per (item, holder) never negative; asset state/holder agree with the ledger; asset state chain unbroken.
@@ -26,6 +28,7 @@ import { env } from '../src/env.js';
 
 const num = (k: string, d: number) => Number(process.env[k] ?? d);
 const slug = process.env.SEED_ORG_SLUG ?? 'load-big';
+const REAL = process.env.SEED_PROFILE === 'real';
 const PASSWORD = process.env.LOAD_PASSWORD ?? 'Load-Test-Password-42';
 const rows = <T>(r: unknown) => (Array.isArray(r) ? r : (r as { rows: T[] }).rows) as T[];
 const t0 = Date.now(); const lap = (m: string) => console.log(`[${((Date.now() - t0) / 1000).toFixed(1)}s] ${m}`);
@@ -76,7 +79,7 @@ await db.execute(sql`
          (select id from seed_cat where rn = 1 + g % ${nc}::int) as category_id,
          (select id from seed_hold where rn = 1 + g % ${nh}::int) as h1,
          (select id from seed_hold where rn = 1 + (g * 7) % ${nh}::int) as h2,
-         case when g % 5 <> 0 then ${EC}::int else ${EA}::int + (g % 2) end as n_events
+         case when g % 5 <> 0 then ${EC}::int + (${REAL}::boolean and g % 50 = 0)::int else ${EA}::int + (case when ${REAL}::boolean then (case when g % 25 = 0 then 0 else 1 end) else g % 2 end) end as n_events
   from generate_series(${off + 1}::int, ${off + N}::int) g`);
 lap(`item plan: ${N} items (offset ${off})`);
 
@@ -89,8 +92,8 @@ await db.execute(sql`
     from seed_items i, lateral generate_series(1, i.n_events) e
   ), fx as (
     select *,
-      case when is_cons then (case type when 'create' then 1000 when 'consume' then -3 when 'checkout' then -5 when 'checkin' then 2 else 10 end) else 0 end as stock_delta,
-      case type when 'checkout' then (case when is_cons then 5 else 1 end) when 'checkin' then (case when is_cons then -2 else -1 end) else 0 end as custody_delta
+      case when is_cons then (case type when 'create' then 1000 when 'consume' then -3 when 'checkout' then -5 when 'checkin' then (case when ${REAL}::boolean then 5 else 2 end) else 10 end) else 0 end as stock_delta,
+      case type when 'checkout' then (case when is_cons then 5 else 1 end) when 'checkin' then (case when is_cons then (case when ${REAL}::boolean then -5 else -2 end) else -1 end) else 0 end as custody_delta
     from ev
   )
   select gen_random_uuid() as tid, item_id, n, is_cons, n_events, e, type, stock_delta, custody_delta,
@@ -99,7 +102,7 @@ await db.execute(sql`
     case when is_cons then sum(stock_delta) over w end as balance_after,
     case when not is_cons then (case type when 'create' then null when 'checkout' then 'available' else 'checked_out' end) end as state_before,
     case when not is_cons then (case type when 'checkin' then 'available' when 'create' then 'available' else 'checked_out' end) end as state_after,
-    case when type = 'create' then (case when is_cons then 1000 end) when type = 'restock' then 10 when type = 'consume' then 3 when type = 'checkout' then (case when is_cons then 5 else 1 end) when type = 'checkin' then (case when is_cons then 2 else 1 end) end as quantity,
+    case when type = 'create' then (case when is_cons then 1000 end) when type = 'restock' then 10 when type = 'consume' then 3 when type = 'checkout' then (case when is_cons then 5 else 1 end) when type = 'checkin' then (case when is_cons then (case when ${REAL}::boolean then 5 else 2 end) else 1 end) end as quantity,
     now() - interval '120 days' + (e::float / n_events) * interval '120 days' + (n % 1000) * interval '1 second' as at
   from fx window w as (partition by item_id order by e)`);
 lap('events computed');

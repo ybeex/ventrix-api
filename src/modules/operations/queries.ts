@@ -137,7 +137,12 @@ export interface CategoryStats {
 /** Per-category rollup for the Collections view. `overdue` reuses the shared outstanding definition, so it always equals the Overdue list. */
 export async function categoryStats(db: Db, orgId: string, nearPct: number, now = new Date()): Promise<Map<string, CategoryStats>> {
   const rows = rowsOf<CategoryStats>(await db.execute(sql`
-    with ${outstandingCte(orgId)}
+    with ${outstandingCte(orgId)},
+    -- overdue lines per category, computed ONCE (a correlated per-category subquery over \`out\` was re-evaluated for every category)
+    ov as materialized (
+      select i2.category_id, count(*)::int as overdue from out o join items i2 on i2.id = o.item_id
+      where o.due_at is not null and o.due_at < ${ts(now)} group by i2.category_id
+    )
     select c.id as category_id,
       count(i.id) filter (where i.type = 'asset')::int as assets,
       count(i.id) filter (where i.type = 'consumable')::int as products,
@@ -149,8 +154,8 @@ export async function categoryStats(db: Db, orgId: string, nearPct: number, now 
       count(i.id) filter (where i.type = 'consumable' and coalesce(i.min_quantity, c.default_min_quantity) is not null and i.quantity_available <= coalesce(i.min_quantity, c.default_min_quantity))::int as low_stock,
       count(i.id) filter (where ${nearPct} > 0 and i.type = 'consumable' and coalesce(i.min_quantity, c.default_min_quantity) > 0 and i.quantity_available > coalesce(i.min_quantity, c.default_min_quantity)
                            and i.quantity_available <= coalesce(i.min_quantity, c.default_min_quantity) + ceil(coalesce(i.min_quantity, c.default_min_quantity) * ${nearPct} / 100.0))::int as near_minimum,
-      (select count(*)::int from out o join items i2 on i2.id = o.item_id where i2.category_id = c.id and o.due_at is not null and o.due_at < ${ts(now)}) as overdue
-    from categories c left join items i on i.category_id = c.id and i.archived_at is null
+      coalesce(max(ov.overdue), 0)::int as overdue
+    from categories c left join items i on i.category_id = c.id and i.archived_at is null left join ov on ov.category_id = c.id
     where c.org_id = ${orgId} and c.archived_at is null
     group by c.id`));
   return new Map(rows.map((r) => [r.category_id, r]));
