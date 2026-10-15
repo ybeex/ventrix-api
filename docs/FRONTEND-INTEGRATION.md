@@ -54,7 +54,7 @@ Every non-2xx has one envelope: `{"error":{"code","message","requestId", "detail
 - `400 VALIDATION_ERROR` carries `details[]` (`instancePath`, `message`): map `instancePath` to the field. Bodies are strict: an unknown field is a 400, so do not send extra properties.
 - `401` → sign in again. `403 FORBIDDEN` → the role lacks the permission (also logged). `404 NOT_FOUND` also covers "exists in another organization".
 - `409` is a business conflict, e.g. `INSUFFICIENT_STOCK`, `HOLDER_MISMATCH`, `CORRECTION_BLOCKED`, `SHELF_NOT_EMPTY`, `CATEGORY_NOT_EMPTY`, `RECONCILIATION_CLOSED`, `ISSUE_RESOLVED`, `EMAIL_TAKEN`, `IDEMPOTENCY_KEY_REUSED`. `422` is a rule the request broke, e.g. `REASON_REQUIRED` (a count that differs from the system needs a reason), `NOT_REPLAYABLE`, `INVALID_EXPIRY`, `SHELF_ARCHIVED`.
-- `429` (rate limit) and `503` (load shedding / dependency down; `Retry-After` is sent on 503): back off and retry **with the same Idempotency-Key**.
+- `429` (rate limit) and `503` (`TEMPORARILY_UNAVAILABLE` / `SERVICE_UNAVAILABLE`: database down or busy, or load shedding; `Retry-After` is always sent on 503): back off and retry **with the same Idempotency-Key**.
 
 ## 6. Offline protocol
 

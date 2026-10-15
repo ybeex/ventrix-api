@@ -46,3 +46,19 @@ export function isUniqueViolation(err: unknown, constraintName?: string): boolea
   if (!info || info.code !== '23505') return false;
   return constraintName ? info.constraint === constraintName : true;
 }
+
+/** Driver/socket-level codes (postgres.js and Node) that mean "the database could not be reached", not "the query was wrong". */
+const CONNECTION_CODES = new Set(['ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', 'EHOSTUNREACH', 'ENOTFOUND', 'EPIPE', 'CONNECTION_ENDED', 'CONNECTION_CLOSED', 'CONNECTION_DESTROYED', 'CONNECT_TIMEOUT']);
+/** SQLSTATEs that mean the server is going away or full: class 08 (connection exception), 57P01-57P03 (shutdown / cannot connect now), 53300 (too many connections). */
+const isConnectionSqlstate = (c: string) => c.startsWith('08') || c === '57P01' || c === '57P02' || c === '57P03' || c === '53300';
+
+/** True when the failure is the database being unreachable or going away — an outage to retry, never a client mistake or a bug to hide as 500. */
+export function isConnectionFailure(err: unknown): boolean {
+  let cur: unknown = err;
+  for (let depth = 0; cur && typeof cur === 'object' && depth < 5; depth++) {
+    const e = cur as { code?: unknown; cause?: unknown };
+    if (typeof e.code === 'string' && (CONNECTION_CODES.has(e.code) || (SQLSTATE.test(e.code) && isConnectionSqlstate(e.code)))) return true;
+    cur = e.cause;
+  }
+  return false;
+}
