@@ -103,7 +103,7 @@ The integrity oracle reports **0 violations after every run** (2.53M rows in ~5 
 
 **Operating the read-model**
 - It is maintained by the `transactions_custody` AFTER INSERT trigger in the same transaction as the ledger row, so it cannot disagree with a committed row. The integrity job's `custody_balances_mismatch` check recomputes it from the ledger; any violation pages like any other.
-- To rebuild (after manual data surgery, or if the check ever fires): `TRUNCATE custody_balances;` then run `npm run migrate` — the backfill runs when the table is empty (2.5M ledger rows backfilled in ~1 s).
+- To rebuild (after manual data surgery, or if the check ever fires): `TRUNCATE custody_balances;` then run `npm run db:migrate` — the backfill runs when the table is empty (2.5M ledger rows backfilled in ~1 s).
 - The two indexes in `0200_perf_indexes.sql` are created with a plain `CREATE INDEX` on first deploy (they take a write lock on `transactions` for the build; ~1 s at 1.7M rows). On a much larger ledger create them first with `CREATE INDEX CONCURRENTLY` under the same names.
 - **Reproduce:** `scripts/seed-load.ts` (repeat runs append), `scripts/time-queries.ts`, `scripts/explain-heavy.ts`, `scripts/measure-endpoints.mjs`, `scripts/load-test.mjs`, `scripts/verify-integrity.ts`.
 - **Measurement hygiene:** a client that times out does **not** cancel its Postgres query; abandoned heavy queries keep running and poison every later measurement (this happened during WS5 and invalidated the first numbers). Check `pg_stat_activity` is idle before timing anything.
