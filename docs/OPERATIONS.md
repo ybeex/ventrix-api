@@ -61,3 +61,51 @@ The activity feed (`GET /activity?category=Security`) shows the same events with
 
 ## Capacity notes
 Hot paths are single-row conditional UPDATEs + one INSERT per ledger row; advisory locks are per idempotency key / per (item, holder), so unrelated work never contends. Dashboard counts read live from indexed tables (no cache) — fine into the hundreds of thousands of items; beyond that, cache per org for a few seconds.
+
+## Performance evidence (WS5)
+
+**Read these numbers as indicative, not as capacity planning.** They were taken on a 1-CPU / 4 GB sandbox where the API, Postgres, Redis and the load generator all shared one core, with the plan's volumes scaled down (below). They show *shape* (what scales with what) and before/after effect, not production throughput. Re-run the scripts on production-like hardware before quoting capacity.
+
+**Dataset** (`scripts/seed-load.ts`, additive and parameterised; the integrity oracle passes over it): two organizations in one database, 2.53M ledger rows and 0.67M audit rows in total.
+- `load-big` (stress profile): 30,000 items, 1,683,000 ledger rows, **24,000 outstanding consumable lines** (every consumable ends with units out — far worse than a real crib).
+- `load-real` (realistic profile, `SEED_PROFILE=real`): 15,000 items, 842,400 ledger rows, ~2% of consumables and ~4% of assets outstanding.
+- The plan's targets (500k items / 20M ledger / 5M audit) were **not reached**: disk and CPU in the sandbox make each 5,000-item slice take ~110 s to build.
+
+**What was wrong, and the fix** (query functions timed 3× each, first run cold; `scripts/time-queries.ts`):
+
+| Screen query | stress org, original | stress org, now | realistic org, original | realistic org, now |
+|---|---|---|---|---|
+| Dashboard counts | 3.3 s | 0.7 s | ~0.8 s | ~70 ms |
+| Outstanding page (50) | 3.3 s | 0.7 s | ~0.43 s | ~45 ms |
+| Collections cards | did not finish in 120 s | 1.7 s | ~0.65 s | ~93 ms |
+| Low-stock page (50) | 16–31 ms | 14 ms | 7 ms | 7 ms |
+
+1. The custody screens aggregated the org's **entire custody ledger on every request** (a parallel sequential scan plus sort of ~1M rows, then a FIFO due-date lookup per outstanding line). Fix: a trigger-maintained read-model `custody_balances` (drizzle/manual/post/0150) read instead of the ledger, plus two covering partial indexes for the FIFO lookup (0200). The screens now cost O(outstanding lines), not O(ledger rows).
+2. Collections computed overdue with a correlated subquery over the outstanding CTE **per category** (200 categories). Fix: aggregate overdue lines per category once and join.
+3. Everything else measured clean at this volume (`/items`, `/holders`, `/activity`, `/reports/*`, `/low-stock`: p50 ≤ 60 ms solo; `/shelves` ~105 ms).
+
+**Mixed load** (`scripts/load-test.mjs`, 8 workers, 45 s, 20% writes: consume and asset checkout→check-in; realistic org). Same hardware, before → after the read-model:
+
+| | requests/s | dashboard p50 / p95 | collections p50 | outstanding p50 | write p95 | non-2xx |
+|---|---|---|---|---|---|---|
+| before | 5.4 | 7.3 s / 8.0 s | 6.2 s | 3.9 s | ≤ 1.1 s | 0 |
+| after | 17.1 | 0.8 s / 1.1 s | 1.2 s | 0.55 s | 0.47–0.69 s | 0 |
+
+The integrity oracle reports **0 violations after every run** (2.53M rows in ~5 s, including the `custody_balances_mismatch` check). Remaining under-load latency is CPU contention on one core (every read competes with Postgres); a second core or a read replica is the next lever, and a short Redis cache of dashboard/Collections counts is available if an org's dashboard is polled aggressively (not built: the read-model made it unnecessary at the measured volumes).
+
+**Failure drills** (API running against the load database, `curl` probes):
+
+| Dependency stopped | Behaviour | Recovery |
+|---|---|---|
+| Redis | every request still succeeds (sessions fall back to the DB, rate limiting fails open, idempotency still enforced by the DB); `/readyz` reports `degraded`, `redis:false`; no hangs | automatic once Redis returns |
+| Postgres | **found a defect**: answered `500 INTERNAL_ERROR`. Now `503 TEMPORARILY_UNAVAILABLE` with `Retry-After: 5`, ~5 ms, including login; `/healthz` stays 200, `/readyz` 503 | automatic, first request after the restart succeeds |
+| Mailgun / S3 | **not run** (no accounts here). Covered by tests only: the outbox retries with backoff and stays queued; the storage breaker opens and uploads answer 503 while the rest of the API works | — |
+
+**Operating the read-model**
+- It is maintained by the `transactions_custody` AFTER INSERT trigger in the same transaction as the ledger row, so it cannot disagree with a committed row. The integrity job's `custody_balances_mismatch` check recomputes it from the ledger; any violation pages like any other.
+- To rebuild (after manual data surgery, or if the check ever fires): `TRUNCATE custody_balances;` then run `npm run migrate` — the backfill runs when the table is empty (2.5M ledger rows backfilled in ~1 s).
+- The two indexes in `0200_perf_indexes.sql` are created with a plain `CREATE INDEX` on first deploy (they take a write lock on `transactions` for the build; ~1 s at 1.7M rows). On a much larger ledger create them first with `CREATE INDEX CONCURRENTLY` under the same names.
+- **Reproduce:** `scripts/seed-load.ts` (repeat runs append), `scripts/time-queries.ts`, `scripts/explain-heavy.ts`, `scripts/measure-endpoints.mjs`, `scripts/load-test.mjs`, `scripts/verify-integrity.ts`.
+- **Measurement hygiene:** a client that times out does **not** cancel its Postgres query; abandoned heavy queries keep running and poison every later measurement (this happened during WS5 and invalidated the first numbers). Check `pg_stat_activity` is idle before timing anything.
+
+**Not covered:** the plan's full volumes; more than one app instance; a connection pooler in front of Postgres; slow-disk and replica-lag behaviour; real Mailgun/S3.

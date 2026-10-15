@@ -18,6 +18,8 @@
  *     of an opaque 500. (With the role-level timeouts in
  *     drizzle/manual/ops/role_settings.sql these will occur, rarely,
  *     under real contention — that's the timeouts doing their job.)
+ *     Connection-level failures (database down, restarting or full: ECONNREFUSED, CONNECTION_ENDED, SQLSTATE 08xxx/57P0x/53300)
+ *     get the same treatment: found by the WS5 failure drill, which showed a plain 500 during a Postgres outage.
  *  4. Fastify-native client errors (malformed JSON, oversized body,
  *     unsupported media type) — anything carrying a 4xx `statusCode`
  *     passes through as that status. Without this, a client sending
@@ -35,7 +37,7 @@
 import fp from 'fastify-plugin';
 import type { FastifyInstance, FastifyRequest, FastifyReply, FastifyError } from 'fastify';
 import { AppError } from '../lib/errors.js';
-import { pgError } from '../lib/db-errors.js';
+import { isConnectionFailure, pgError } from '../lib/db-errors.js';
 
 const TRANSIENT_DB_CODES = new Set([
   '55P03', // lock_not_available (lock_timeout)
@@ -63,6 +65,13 @@ export default fp(async function errorHandlerPlugin(app: FastifyInstance) {
       req.log.warn({ err, sqlstate: pg.code }, 'transient database condition');
       reply.header('retry-after', '1');
       return send(503, 'TEMPORARILY_UNAVAILABLE', 'The service is busy; please retry shortly');
+    }
+
+    // The database is unreachable or going away: an outage the client should retry, not a bug (and not a 500 that pages the wrong people).
+    if (isConnectionFailure(err)) {
+      req.log.error({ err }, 'database unreachable');
+      reply.header('retry-after', '5');
+      return send(503, 'TEMPORARILY_UNAVAILABLE', 'The service is temporarily unavailable; please retry shortly');
     }
 
     // Constraint violations that reach here slipped past service-level checks (a race, or a bug).

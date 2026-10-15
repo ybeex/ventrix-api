@@ -9,6 +9,7 @@
  *  negative_custody         no holder's outstanding balance for an item is below zero
  *  asset_custody_mismatch   an asset is checked_out ⇔ exactly one holder has custody (and it is current_holder_id)
  *  asset_state_chain_broken every asset ledger row's state_before == the previous row's state_after
+ *  custody_balances_mismatch the trigger-maintained custody read-model equals the ledger aggregate for every (item, holder)
  */
 import { sql } from 'drizzle-orm';
 import type { Db } from '../../db/index.js';
@@ -65,6 +66,19 @@ export async function findViolations(db: Db, orgId?: string): Promise<Violation[
       where i.type = 'asset' and t.state_after is not null ${org}) x
     where prev_after is not null and before is distinct from prev_after`))) {
     out.push({ check: 'asset_state_chain_broken', itemId: r.item_id, detail: { seq: r.seq, stateBefore: r.before, previousStateAfter: r.prev_after } });
+  }
+
+  const tb = orgId ? sql`and org_id = ${orgId}` : sql``;
+  for (const r of rowsOf<{ item_id: string; holder_id: string; l: number | null; c: number | null; li: number | null; ci: number | null; lr: number | null; cr: number | null }>(await db.execute(sql`
+    select coalesce(l.item_id, c.item_id) as item_id, coalesce(l.holder_id, c.holder_id) as holder_id,
+           l.q as l, c.quantity as c, l.issued as li, c.issued as ci, l.returned as lr, c.returned as cr
+    from (select item_id, holder_id, sum(custody_delta)::int as q,
+                 coalesce(sum(custody_delta) filter (where custody_delta > 0 and type <> 'correction'), 0)::int as issued,
+                 coalesce(sum(-custody_delta) filter (where custody_delta < 0 and type <> 'correction'), 0)::int as returned
+          from transactions where holder_id is not null and custody_delta <> 0 ${tb} group by 1, 2) l
+    full join (select item_id, holder_id, quantity, issued, returned from custody_balances where true ${tb}) c on c.item_id = l.item_id and c.holder_id = l.holder_id
+    where l.q is distinct from c.quantity or l.issued is distinct from c.issued or l.returned is distinct from c.returned`))) {
+    out.push({ check: 'custody_balances_mismatch', itemId: r.item_id, detail: { holderId: r.holder_id, ledgerQuantity: r.l, balanceQuantity: r.c, ledgerIssued: r.li, balanceIssued: r.ci, ledgerReturned: r.lr, balanceReturned: r.cr } });
   }
   return out;
 }

@@ -22,14 +22,10 @@ export const outstandingCte = (orgId?: string) => {
   const to = orgId ? sql`and t.org_id = ${orgId}` : sql``;
   return sql`
   bal as (
-    select t.item_id, t.holder_id, sum(t.custody_delta)::int as quantity,
-           coalesce(sum(t.custody_delta) filter (where t.custody_delta > 0), 0)::int as issued_all,
-           coalesce(sum(t.custody_delta) filter (where t.custody_delta > 0 and t.type <> 'correction'), 0)::int as issued,
-           coalesce(sum(-t.custody_delta) filter (where t.custody_delta < 0 and t.type <> 'correction'), 0)::int as returned,
-           max(t.created_at) filter (where t.type = 'checkout') as since
-    from transactions t join items i on i.id = t.item_id
-    where t.holder_id is not null and i.type = 'consumable' and t.custody_delta <> 0 ${to}
-    group by t.item_id, t.holder_id having sum(t.custody_delta) > 0
+    -- maintained by the transactions_custody trigger (drizzle/manual/post/0150); the integrity oracle proves it equals the ledger
+    select b.item_id, b.holder_id, b.quantity, b.issued_all, b.issued, b.returned, b.since
+    from custody_balances b join items i on i.id = b.item_id
+    where b.quantity > 0 and i.type = 'consumable' ${orgId ? sql`and b.org_id = ${orgId}` : sql``}
   ),
   iss as (
     select t.item_id, t.holder_id, t.due_at, sum(t.custody_delta) over (partition by t.item_id, t.holder_id order by t.seq) as cum

@@ -80,7 +80,7 @@ src/lib/                         errors, pagination, idempotency, permissions, c
 src/plugins/                     perimeter security, auth, access (fail-closed), errors, observability
 src/modules/<name>/              one folder per bounded module: service.ts · routes.ts (· queries.ts · schemas.ts)
 drizzle/                         generated migrations + manual/{pre,post}/ SQL (extensions, immutability triggers)
-test/                            360+ integration tests against real Postgres and Redis
+test/                            390+ integration tests against real Postgres and Redis
 docs/                            DECISIONS · SECURITY · OPERATIONS · AUDIT-FINDINGS · openapi.json
 ```
 
