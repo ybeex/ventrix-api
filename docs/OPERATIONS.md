@@ -37,6 +37,28 @@
 | Latency | `http_request_duration_seconds{route,status}` | p95/p99 per route |
 | Jobs / mail | `storekeeper_jobs_total{job,outcome}`, `storekeeper_emails_total{outcome}` | `failed` / `dead` rising |
 
+### Alerts and dashboard as code
+`deploy/prometheus/storekeeper.rules.yml` (16 rules, validated and unit-tested with `promtool`, see `storekeeper.rules.test.yml`) and `deploy/grafana/storekeeper-overview.json` (12 panels; import it and pick your Prometheus data source). A test fails the build if a rule or panel uses a metric the app does not export, or if an alert is missing from this page.
+
+| Alert | Severity | Fires when | First step |
+|---|---|---|---|
+| `StoreKeeperIntegrityViolation` | page | `storekeeper_integrity_violations > 0` | Runbook: integrity violation. Do not edit data by hand. |
+| `StoreKeeperApiDown` | page | an API target is down for 2 min | `/healthz`, container, load balancer |
+| `StoreKeeperWorkerNotRunning` | page | no `email` job success for 15 min | worker deployment, Redis |
+| `StoreKeeperDependencyCircuitOpen` | page | a breaker open for 5 min | see Runbooks (mailgun / storage / redis / queue) |
+| `StoreKeeperHighErrorRate` | page | >2% 5xx for 10 min with real traffic | split by status/route: 503 = dependency, 500 = bug |
+| `StoreKeeperServiceUnavailableSustained` | warn | 503s for 5 min | `/readyz`: Postgres or Redis; else load shedding |
+| `StoreKeeperSlowRoutes` | warn | route p95 > 1 s for 15 min | `scripts/explain-heavy.ts`, Postgres load |
+| `StoreKeeperEventLoopLag` | warn | lag > 0.5 s for 10 min | scale out; expect shedding |
+| `StoreKeeperJobFailing` | warn | a job failed >3× in 30 min | worker logs (scanners are safe to re-run) |
+| `StoreKeeperEmailDeadLetters` | warn | e-mails gave up after all retries | Mailgun credentials/domain |
+| `StoreKeeperEmailSuppressionSpike` | warn | >20 bounces/complaints in an hour | what was sent; SPF/DKIM; Mailgun dashboard |
+| `StoreKeeperAuthFailureSpike` | warn | >1 failed sign-in/s for 10 min | audit `auth.login_failed` per org |
+| `StoreKeeperAccountLockouts` | warn | >10 attempts on locked accounts in 15 min | targeted guessing or a stale client |
+| `StoreKeeperTransactionConflicts` | warn | >25% of ledger ops refused for 30 min | error codes in logs, recent client release |
+| `StoreKeeperSyncProblems` | warn | >20% of offline actions conflict/rejected | stale snapshots or invalid payloads |
+| `StoreKeeperDiscrepancyRate` | info | >30% of the day's counts show variance | discrepancy report |
+
 ## Audit-based alerts (SQL; `audit_events` is the source)
 Run these on a schedule or from your log pipeline; there is no metric for them yet.
 ```sql

@@ -1,0 +1,95 @@
+# StoreKeeper alert rules. Scrape job names assumed: `storekeeper-api` (the API, GET /metrics with the bearer METRICS_TOKEN) — the worker exports its job counters through the same registry when scraped.
+# Validate:  promtool check rules deploy/prometheus/storekeeper.rules.yml      Unit tests:  promtool test rules deploy/prometheus/storekeeper.rules.test.yml
+# Every metric used here is checked against the app's real /metrics output by test/ops-assets.test.ts.
+groups:
+  - name: storekeeper-critical
+    rules:
+      - alert: StoreKeeperIntegrityViolation
+        expr: storekeeper_integrity_violations > 0
+        labels: { severity: page }
+        annotations:
+          summary: "Ledger integrity violation(s): {{ $value }}"
+          description: "The integrity oracle found stock, custody, state-chain or custody_balances drift. Do not 'fix' data by hand: follow OPERATIONS.md → Runbooks → integrity violation."
+      - alert: StoreKeeperApiDown
+        expr: up{job="storekeeper-api"} == 0
+        for: 2m
+        labels: { severity: page }
+        annotations: { summary: "StoreKeeper API instance {{ $labels.instance }} is not scrapeable", description: "Check /healthz, the container and the load balancer." }
+      - alert: StoreKeeperWorkerNotRunning
+        expr: sum(increase(storekeeper_jobs_total{job="email",outcome="ok"}[10m])) == 0
+        for: 5m
+        labels: { severity: page }
+        annotations: { summary: "No background jobs have run for 15 minutes", description: "The e-mail job runs every 10 s. Invites, resets, notifications and the integrity audit are stalled: check the worker deployment and Redis." }
+      - alert: StoreKeeperDependencyCircuitOpen
+        expr: max by (name) (circuit_breaker_state) == 2
+        for: 5m
+        labels: { severity: page }
+        annotations: { summary: "Circuit breaker '{{ $labels.name }}' has been open for 5 minutes", description: "mailgun: invites/resets queue up (outbox retries). storage*: uploads and downloads answer 503. redis/queue: imports and background jobs cannot be scheduled. See OPERATIONS.md." }
+      - alert: StoreKeeperHighErrorRate
+        expr: |
+          sum(rate(http_request_duration_seconds_count{status=~"5.."}[5m])) / sum(rate(http_request_duration_seconds_count[5m])) > 0.02
+          and sum(rate(http_request_duration_seconds_count[5m])) > 0.2
+        for: 10m
+        labels: { severity: page }
+        annotations: { summary: "More than 2% of requests are failing with 5xx", description: "A 503 means a dependency outage or load shedding (clients retry); a 500 is a bug. Split by status and route; see OPERATIONS.md → Runbooks." }
+
+  - name: storekeeper-warning
+    rules:
+      - alert: StoreKeeperServiceUnavailableSustained
+        expr: sum(rate(http_request_duration_seconds_count{status="503"}[5m])) > 0.5
+        for: 5m
+        labels: { severity: warn }
+        annotations: { summary: "The API has been answering 503 for 5 minutes", description: "Database/Redis unreachable (see /readyz) or load shedding. Check Postgres, then CPU/event-loop lag." }
+      - alert: StoreKeeperSlowRoutes
+        expr: |
+          histogram_quantile(0.95, sum by (le, route) (rate(http_request_duration_seconds_bucket{route!~"/metrics|/healthz|/readyz"}[10m]))) > 1
+          and on (route) sum by (route) (rate(http_request_duration_seconds_count[10m])) > 0.05
+        for: 15m
+        labels: { severity: warn }
+        annotations: { summary: "p95 latency above 1 s on {{ $labels.route }}", description: "Check EXPLAIN on the statement behind this route (scripts/explain-heavy.ts) and Postgres load. Custody screens should be well under 1 s since the custody read-model." }
+      - alert: StoreKeeperEventLoopLag
+        expr: avg_over_time(nodejs_eventloop_lag_seconds[5m]) > 0.5
+        for: 10m
+        labels: { severity: warn }
+        annotations: { summary: "Node event-loop lag above 500 ms", description: "CPU-bound work or saturation: scale out, and expect load-shedding 503s." }
+      - alert: StoreKeeperJobFailing
+        expr: sum by (job) (increase(storekeeper_jobs_total{outcome="failed"}[30m])) > 3
+        labels: { severity: warn }
+        annotations: { summary: "Background job '{{ $labels.job }}' failed {{ $value }} times in 30 minutes", description: "Read the worker logs; overdue/cycle/integrity jobs are scanners and safe to re-run." }
+      - alert: StoreKeeperEmailDeadLetters
+        expr: sum(increase(storekeeper_emails_total{outcome="dead"}[1h])) > 0
+        labels: { severity: warn }
+        annotations: { summary: "E-mails gave up after all retries", description: "Rows in email_outbox with status 'failed'. Check Mailgun credentials/domain; bounced addresses are suppressed automatically and are not counted here." }
+      - alert: StoreKeeperEmailSuppressionSpike
+        expr: sum(increase(storekeeper_email_suppressions_total[1h])) > 20
+        labels: { severity: warn }
+        annotations: { summary: "Many recipients bounced or complained in the last hour", description: "A burst of bounces/complaints damages the sending domain's reputation: check what was sent, SPF/DKIM and the Mailgun dashboard." }
+      - alert: StoreKeeperAuthFailureSpike
+        expr: sum(rate(storekeeper_auth_failures_total{reason=~"bad_password|unknown_user|pin_failed"}[5m])) > 1
+        for: 10m
+        labels: { severity: warn }
+        annotations: { summary: "Sustained failed sign-ins (>1/s)", description: "Possible credential stuffing. Per-org detail: audit_events action auth.login_failed (OPERATIONS.md → Audit-based alerts)." }
+      - alert: StoreKeeperAccountLockouts
+        expr: sum(increase(storekeeper_auth_failures_total{reason="locked"}[15m])) > 10
+        labels: { severity: warn }
+        annotations: { summary: "Many sign-in attempts hit locked accounts", description: "Targeted guessing, or a client retrying with a stale password." }
+      - alert: StoreKeeperTransactionConflicts
+        expr: |
+          sum(rate(storekeeper_transactions_total{outcome=~"conflict|rejected"}[15m])) / sum(rate(storekeeper_transactions_total[15m])) > 0.25
+          and sum(rate(storekeeper_transactions_total[15m])) > 0.05
+        for: 30m
+        labels: { severity: warn }
+        annotations: { summary: "Over 25% of ledger operations are being refused", description: "Insufficient stock, wrong holder, or a client bug. Look at the error codes in logs and at recent client releases." }
+      - alert: StoreKeeperSyncProblems
+        expr: |
+          sum(rate(storekeeper_sync_actions_total{outcome=~"conflict|rejected"}[30m])) / sum(rate(storekeeper_sync_actions_total[30m])) > 0.2
+          and sum(rate(storekeeper_sync_actions_total[30m])) > 0.02
+        for: 30m
+        labels: { severity: warn }
+        annotations: { summary: "Over 20% of offline-queued actions end as conflicts or rejections", description: "Devices are working from stale snapshots, or sending invalid payloads (rejected actions can only be dismissed)." }
+      - alert: StoreKeeperDiscrepancyRate
+        expr: |
+          sum(increase(storekeeper_reconciliation_discrepancies_total[24h])) / sum(increase(storekeeper_reconciliation_counts_total[24h])) > 0.3
+          and sum(increase(storekeeper_reconciliation_counts_total[24h])) >= 10
+        labels: { severity: info }
+        annotations: { summary: "Over 30% of today's stock counts found a variance", description: "Shrinkage, mis-issues or counting discipline; review the discrepancy report." }

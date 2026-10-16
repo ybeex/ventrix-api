@@ -1,0 +1,122 @@
+# promtool test rules deploy/prometheus/storekeeper.rules.test.yml
+rule_files: [storekeeper.rules.yml]
+evaluation_interval: 1m
+tests:
+  - name: integrity violation pages immediately, and clears
+    interval: 1m
+    input_series:
+      - { series: 'storekeeper_integrity_violations', values: '0 0 2 2 0' }
+    alert_rule_test:
+      - { eval_time: 1m, alertname: StoreKeeperIntegrityViolation, exp_alerts: [] }
+      - eval_time: 2m
+        alertname: StoreKeeperIntegrityViolation
+        exp_alerts:
+          - exp_labels: { severity: page }
+            exp_annotations:
+              summary: "Ledger integrity violation(s): 2"
+              description: "The integrity oracle found stock, custody, state-chain or custody_balances drift. Do not 'fix' data by hand: follow OPERATIONS.md → Runbooks → integrity violation."
+      - { eval_time: 4m, alertname: StoreKeeperIntegrityViolation, exp_alerts: [] }
+
+  - name: an open breaker pages only after 5 minutes, per dependency
+    interval: 1m
+    input_series:
+      - { series: 'circuit_breaker_state{name="mailgun"}', values: '0 2 2 2 2 2 2 2' }
+      - { series: 'circuit_breaker_state{name="storage"}', values: '1 1 1 1 1 1 1 1' }
+    alert_rule_test:
+      - { eval_time: 4m, alertname: StoreKeeperDependencyCircuitOpen, exp_alerts: [] }
+      - eval_time: 7m
+        alertname: StoreKeeperDependencyCircuitOpen
+        exp_alerts:
+          - exp_labels: { severity: page, name: mailgun }
+            exp_annotations:
+              summary: "Circuit breaker 'mailgun' has been open for 5 minutes"
+              description: "mailgun: invites/resets queue up (outbox retries). storage*: uploads and downloads answer 503. redis/queue: imports and background jobs cannot be scheduled. See OPERATIONS.md."
+
+  - name: worker liveness - jobs stop counting
+    interval: 1m
+    input_series:
+      - { series: 'storekeeper_jobs_total{job="email",outcome="ok"}', values: '0+6x10 60+0x20' }
+    alert_rule_test:
+      - { eval_time: 10m, alertname: StoreKeeperWorkerNotRunning, exp_alerts: [] }
+      - eval_time: 28m
+        alertname: StoreKeeperWorkerNotRunning
+        exp_alerts:
+          - exp_labels: { severity: page }
+            exp_annotations: { summary: "No background jobs have run for 15 minutes", description: "The e-mail job runs every 10 s. Invites, resets, notifications and the integrity audit are stalled: check the worker deployment and Redis." }
+
+  - name: 5xx ratio needs both a high ratio and real traffic
+    interval: 1m
+    input_series:
+      - { series: 'http_request_duration_seconds_count{status="500",route="/v1/items"}', values: '0+30x30' }
+      - { series: 'http_request_duration_seconds_count{status="200",route="/v1/items"}', values: '0+600x30' }
+      - { series: 'http_request_duration_seconds_count{status="500",route="/v1/quiet"}', values: '0+1x30' }
+    alert_rule_test:
+      - eval_time: 25m
+        alertname: StoreKeeperHighErrorRate
+        exp_alerts:
+          - exp_labels: { severity: page }
+            exp_annotations: { summary: "More than 2% of requests are failing with 5xx", description: "A 503 means a dependency outage or load shedding (clients retry); a 500 is a bug. Split by status and route; see OPERATIONS.md → Runbooks." }
+
+  - name: a lone 5xx on a quiet system does not page
+    interval: 1m
+    input_series:
+      - { series: 'http_request_duration_seconds_count{status="500",route="/v1/quiet"}', values: '0+1x30' }
+      - { series: 'http_request_duration_seconds_count{status="200",route="/v1/quiet"}', values: '0+4x30' }
+    alert_rule_test:
+      - { eval_time: 25m, alertname: StoreKeeperHighErrorRate, exp_alerts: [] }
+
+  - name: sustained 503 (dependency outage) warns after 5 minutes
+    interval: 1m
+    input_series:
+      - { series: 'http_request_duration_seconds_count{status="503",route="/v1/items"}', values: '0+60x20' }
+    alert_rule_test:
+      - { eval_time: 3m, alertname: StoreKeeperServiceUnavailableSustained, exp_alerts: [] }
+      - eval_time: 12m
+        alertname: StoreKeeperServiceUnavailableSustained
+        exp_alerts:
+          - exp_labels: { severity: warn }
+            exp_annotations: { summary: "The API has been answering 503 for 5 minutes", description: "Database/Redis unreachable (see /readyz) or load shedding. Check Postgres, then CPU/event-loop lag." }
+
+  - name: email dead letters and suppression spikes
+    interval: 1m
+    input_series:
+      - { series: 'storekeeper_emails_total{outcome="dead"}', values: '0 0 0 1 1 1' }
+      - { series: 'storekeeper_email_suppressions_total{reason="bounce"}', values: '0+1x10 10+5x50' }
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: StoreKeeperEmailDeadLetters
+        exp_alerts:
+          - exp_labels: { severity: warn }
+            exp_annotations: { summary: "E-mails gave up after all retries", description: "Rows in email_outbox with status 'failed'. Check Mailgun credentials/domain; bounced addresses are suppressed automatically and are not counted here." }
+      - { eval_time: 8m, alertname: StoreKeeperEmailSuppressionSpike, exp_alerts: [] }
+      - eval_time: 40m
+        alertname: StoreKeeperEmailSuppressionSpike
+        exp_alerts:
+          - exp_labels: { severity: warn }
+            exp_annotations: { summary: "Many recipients bounced or complained in the last hour", description: "A burst of bounces/complaints damages the sending domain's reputation: check what was sent, SPF/DKIM and the Mailgun dashboard." }
+
+  - name: transaction refusals above 25% with traffic warn after 30 minutes
+    interval: 1m
+    input_series:
+      - { series: 'storekeeper_transactions_total{type="consume",outcome="conflict"}', values: '0+4x60' }
+      - { series: 'storekeeper_transactions_total{type="consume",outcome="committed"}', values: '0+6x60' }
+    alert_rule_test:
+      - { eval_time: 20m, alertname: StoreKeeperTransactionConflicts, exp_alerts: [] }
+      - eval_time: 55m
+        alertname: StoreKeeperTransactionConflicts
+        exp_alerts:
+          - exp_labels: { severity: warn }
+            exp_annotations: { summary: "Over 25% of ledger operations are being refused", description: "Insufficient stock, wrong holder, or a client bug. Look at the error codes in logs and at recent client releases." }
+
+  - name: an unreachable API instance pages after 2 minutes
+    interval: 1m
+    input_series:
+      - { series: 'up{job="storekeeper-api",instance="api-1:3000"}', values: '1 1 0 0 0 0' }
+      - { series: 'up{job="storekeeper-api",instance="api-2:3000"}', values: '1 1 1 1 1 1' }
+    alert_rule_test:
+      - { eval_time: 3m, alertname: StoreKeeperApiDown, exp_alerts: [] }
+      - eval_time: 5m
+        alertname: StoreKeeperApiDown
+        exp_alerts:
+          - exp_labels: { severity: page, job: storekeeper-api, instance: "api-1:3000" }
+            exp_annotations: { summary: "StoreKeeper API instance api-1:3000 is not scrapeable", description: "Check /healthz, the container and the load balancer." }
