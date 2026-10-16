@@ -51,6 +51,10 @@ export const metrics = {
   integrityViolations: new client.Gauge({
     name: 'storekeeper_integrity_violations', help: 'Ledger integrity violations found by the last audit (should be 0)', registers: reg,
   }),
+  emailSuppressions: new client.Counter({
+    name: 'storekeeper_email_suppressions_total', help: 'Addresses suppressed by provider webhook events',
+    labelNames: ['reason'] as const, registers: reg,
+  }),
   emails: new client.Counter({
     name: 'storekeeper_emails_total', help: 'Outbound emails by outcome',
     labelNames: ['outcome'] as const, registers: reg,

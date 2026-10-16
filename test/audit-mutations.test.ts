@@ -20,7 +20,10 @@ before(async () => {
 after(async () => { await app.close(); });
 
 /** Mutations that intentionally write no audit row (reading your own notifications is not an auditable act). */
-const UNAUDITED = new Set(['POST /v1/notifications/:id/read', 'POST /v1/notifications/read-all']);
+const UNAUDITED = new Set([
+  'POST /v1/notifications/:id/read', 'POST /v1/notifications/read-all',
+  'POST /v1/webhooks/mailgun', // system-to-system, no tenant/user to attribute: HMAC-verified, logged (warn) and counted (storekeeper_email_suppressions_total)
+]);
 
 type Res = Awaited<ReturnType<typeof call>>;
 interface Entry { run: () => Promise<Res>; expect: string[]; org?: (r: Res) => string }
