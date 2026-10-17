@@ -120,10 +120,13 @@ test('PRODUCTION BOOT VALIDATION: weak or missing secrets refuse to start; a com
   assert.equal(weak.status, 1);
   for (const must of ['FILE_URL_SECRET', 'METRICS_TOKEN', 'CORS_ORIGINS', 'APP_BASE_URL', 'FORCE_HTTPS', 'MAIL_DRIVER', 'STORAGE_DRIVER']) assert.match(weak.stderr, new RegExp(must), `${must} must be demanded in production`);
   assert.doesNotMatch(weak.stdout, /BOOT_OK/);
-  const good = run({ ...base, FILE_URL_SECRET: 'x'.repeat(40), METRICS_TOKEN: 'm'.repeat(32), CORS_ORIGINS: 'https://app.example.com', APP_BASE_URL: 'https://app.example.com', FORCE_HTTPS: 'true',
-    MAIL_DRIVER: 'mailgun', MAILGUN_SMTP_USER: 'postmaster@mg.example.com', MAILGUN_SMTP_PASS: 'secret', STORAGE_DRIVER: 's3', S3_BUCKET: 'b', S3_ACCESS_KEY_ID: 'k', S3_SECRET_ACCESS_KEY: 's' });
+  const complete = { ...base, FILE_URL_SECRET: 'x'.repeat(40), METRICS_TOKEN: 'm'.repeat(32), CORS_ORIGINS: 'https://app.example.com', APP_BASE_URL: 'https://app.example.com', FORCE_HTTPS: 'true',
+    MAIL_DRIVER: 'mailgun', MAILGUN_SMTP_USER: 'postmaster@mg.example.com', MAILGUN_SMTP_PASS: 'secret', MAILGUN_WEBHOOK_SIGNING_KEY: 'w'.repeat(32), STORAGE_DRIVER: 's3', S3_BUCKET: 'b', S3_ACCESS_KEY_ID: 'k', S3_SECRET_ACCESS_KEY: 's' };
+  const good = run(complete);
   assert.equal(good.status, 0, good.stderr);
   assert.match(good.stdout, /BOOT_OK/);
+  const noHook = run({ ...complete, MAILGUN_WEBHOOK_SIGNING_KEY: '' }); // bounces and complaints would never stop retries
+  assert.equal(noHook.status, 1); assert.match(noHook.stderr, /MAILGUN_WEBHOOK_SIGNING_KEY: required/);
   const partial = run({ ...base, FILE_URL_SECRET: 'short', METRICS_TOKEN: 'm'.repeat(32), CORS_ORIGINS: 'https://a', APP_BASE_URL: 'http://insecure.example', FORCE_HTTPS: 'true', MAIL_DRIVER: 'log', STORAGE_DRIVER: 'local' });
   assert.equal(partial.status, 1);
   assert.match(partial.stderr, /APP_BASE_URL: must be https/);
