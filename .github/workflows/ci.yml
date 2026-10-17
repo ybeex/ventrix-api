@@ -25,6 +25,11 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
       - run: npm ci
+      - name: Install promtool (alert rules are validated and unit-tested in npm test)
+        run: |
+          curl -sSfL -o prom.tgz https://github.com/prometheus/prometheus/releases/download/v2.54.1/prometheus-2.54.1.linux-amd64.tar.gz
+          echo "31715ef65e8a898d0f97c8c08c03b6b9afe485ac84e1698bcfec90fc6e62924f  prom.tgz" | sha256sum -c -
+          tar xzf prom.tgz --strip-components=1 prometheus-2.54.1.linux-amd64/promtool && sudo mv promtool /usr/local/bin/ && promtool --version
       - run: npm run lint          # tsc --noEmit
       - run: npm run build
       - run: npm test              # real Postgres + Redis; migrations applied by the test harness

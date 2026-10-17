@@ -41856,6 +41856,112 @@
           }
         }
       }
+    },
+    "/v1/webhooks/mailgun": {
+      "post": {
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "type": "object",
+                "required": [
+                  "signature",
+                  "event-data"
+                ],
+                "properties": {
+                  "signature": {
+                    "additionalProperties": false,
+                    "type": "object",
+                    "required": [
+                      "timestamp",
+                      "token",
+                      "signature"
+                    ],
+                    "properties": {
+                      "timestamp": {
+                        "maxLength": 20,
+                        "type": "string"
+                      },
+                      "token": {
+                        "minLength": 8,
+                        "maxLength": 200,
+                        "type": "string"
+                      },
+                      "signature": {
+                        "minLength": 16,
+                        "maxLength": 200,
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "event-data": {
+                    "additionalProperties": true,
+                    "type": "object",
+                    "required": [
+                      "event",
+                      "recipient"
+                    ],
+                    "properties": {
+                      "event": {
+                        "maxLength": 40,
+                        "type": "string"
+                      },
+                      "recipient": {
+                        "minLength": 3,
+                        "maxLength": 320,
+                        "type": "string"
+                      },
+                      "severity": {
+                        "maxLength": 20,
+                        "type": "string"
+                      },
+                      "id": {
+                        "maxLength": 200,
+                        "type": "string"
+                      },
+                      "delivery-status": {
+                        "additionalProperties": true,
+                        "type": "object",
+                        "properties": {
+                          "message": {
+                            "type": "string"
+                          },
+                          "description": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "type": "object",
+                  "required": [
+                    "status"
+                  ],
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "security": [

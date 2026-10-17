@@ -26,6 +26,7 @@
 | Session management | Users list and revoke their own sessions (including the current one); admins list and revoke all sessions of anyone in their org; revocation is immediate (cache invalidated); other tenants get 404. | `sessions.test.ts` |
 | Role-based invites | Invite/resend/revoke/list follow the matrix in DECISIONS #19, including the `supervisorsCanInvite` switch; a refused invite creates nothing; invite links are single-use and replaced on resend; revoke kills the link. | `invites.test.ts` (full 4×4 role matrix) |
 | Read logging | Viewing the activity feed or a report writes `activity.viewed` / `report.viewed` (first page only), CSV export writes `report.exported`. | `activity.test.ts` |
+| Mailgun webhook | Public endpoint authenticated by HMAC-SHA256 over `timestamp+token` with the webhook signing key (timing-safe compare), 5-minute freshness window and a one-time-token replay guard; with no key configured it rejects everything; bad input is a 400, a bad signature a 401 with no side effects. | `mail-webhook.test.ts` |
 | Audit completeness | Every mutating route must write an audit row or be on an explicit allowlist; the test fails when a new route is neither. | `audit-mutations.test.ts` |
 
 ## Not covered (be aware)
@@ -42,6 +43,9 @@
 - **`access.denied` bursts are recorded but not alerted on by the app**; wire the query in OPERATIONS.md into your alerting.
 - **Known low-severity leak:** a supervisor resending/revoking an invitation for an admin-role user gets 403 rather than 404, confirming that user id exists in their organization (ids are random UUIDs; same tenant only). See AUDIT-FINDINGS D2.
 - Audit rows contain e-mail addresses and IPs (personal data); plan retention accordingly — rows cannot be deleted through the app.
+
+- **The Mailgun webhook's replay guard fails open if Redis is down** (the signature and the 5-minute window still apply; replaying inside the window would only re-suppress an address that is already suppressed).
+- Suppressions are global (one address bounces for every organization) and are removed only by an operator with database access.
 
 ## Reporting & response
 Treat any `storekeeper_integrity_violations > 0`, a sustained `circuit_breaker_state{name=…} == 2`, a spike in

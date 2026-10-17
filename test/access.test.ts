@@ -21,7 +21,8 @@ after(async () => { await app.close(); });
 const PUBLIC_ALLOWLIST = new Set([
   'GET /healthz', 'GET /readyz', 'GET /metrics',
   'POST /v1/auth/register-org', 'POST /v1/auth/login', 'POST /v1/auth/accept-invite', 'POST /v1/auth/password-reset/request', 'POST /v1/auth/password-reset/confirm',
-  'GET /v1/files/:id/content',
+  'GET /v1/files/:id/content',     // authenticated by an HMAC-signed, expiring URL
+  'POST /v1/webhooks/mailgun',    // authenticated by Mailgun's HMAC signature + freshness window + one-time token (mail-webhook.test.ts)
 ]);
 
 const unique = () => {
