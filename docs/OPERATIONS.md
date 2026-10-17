@@ -37,6 +37,28 @@
 | Latency | `http_request_duration_seconds{route,status}` | p95/p99 per route |
 | Jobs / mail | `storekeeper_jobs_total{job,outcome}`, `storekeeper_emails_total{outcome}` | `failed` / `dead` rising |
 
+### Alerts and dashboard as code
+`deploy/prometheus/storekeeper.rules.yml` (16 rules, validated and unit-tested with `promtool`, see `storekeeper.rules.test.yml`) and `deploy/grafana/storekeeper-overview.json` (12 panels; import it and pick your Prometheus data source). A test fails the build if a rule or panel uses a metric the app does not export, or if an alert is missing from this page.
+
+| Alert | Severity | Fires when | First step |
+|---|---|---|---|
+| `StoreKeeperIntegrityViolation` | page | `storekeeper_integrity_violations > 0` | Runbook: integrity violation. Do not edit data by hand. |
+| `StoreKeeperApiDown` | page | an API target is down for 2 min | `/healthz`, container, load balancer |
+| `StoreKeeperWorkerNotRunning` | page | no `email` job success for 15 min | worker deployment, Redis |
+| `StoreKeeperDependencyCircuitOpen` | page | a breaker open for 5 min | see Runbooks (mailgun / storage / redis / queue) |
+| `StoreKeeperHighErrorRate` | page | >2% 5xx for 10 min with real traffic | split by status/route: 503 = dependency, 500 = bug |
+| `StoreKeeperServiceUnavailableSustained` | warn | 503s for 5 min | `/readyz`: Postgres or Redis; else load shedding |
+| `StoreKeeperSlowRoutes` | warn | route p95 > 1 s for 15 min | `scripts/explain-heavy.ts`, Postgres load |
+| `StoreKeeperEventLoopLag` | warn | lag > 0.5 s for 10 min | scale out; expect shedding |
+| `StoreKeeperJobFailing` | warn | a job failed >3× in 30 min | worker logs (scanners are safe to re-run) |
+| `StoreKeeperEmailDeadLetters` | warn | e-mails gave up after all retries | Mailgun credentials/domain |
+| `StoreKeeperEmailSuppressionSpike` | warn | >20 bounces/complaints in an hour | what was sent; SPF/DKIM; Mailgun dashboard |
+| `StoreKeeperAuthFailureSpike` | warn | >1 failed sign-in/s for 10 min | audit `auth.login_failed` per org |
+| `StoreKeeperAccountLockouts` | warn | >10 attempts on locked accounts in 15 min | targeted guessing or a stale client |
+| `StoreKeeperTransactionConflicts` | warn | >25% of ledger ops refused for 30 min | error codes in logs, recent client release |
+| `StoreKeeperSyncProblems` | warn | >20% of offline actions conflict/rejected | stale snapshots or invalid payloads |
+| `StoreKeeperDiscrepancyRate` | info | >30% of the day's counts show variance | discrepancy report |
+
 ## Audit-based alerts (SQL; `audit_events` is the source)
 Run these on a schedule or from your log pipeline; there is no metric for them yet.
 ```sql
@@ -53,7 +75,11 @@ The activity feed (`GET /activity?category=Security`) shows the same events with
 - **Integrity violation** — the log line `LEDGER INTEGRITY VIOLATIONS` lists check name, item and numbers. Do **not** edit rows. Identify the cause (a manual SQL change, a deploy bug), then repair by *appending* a correcting transaction through the API (or a reviewed SQL insert that follows the ledger invariants), and re-run the audit job.
 - **A breaker is open** — `mailgun`: mail queues in `email_outbox` (status `pending`) and drains on recovery; check Mailgun status/creds. `storage*`: uploads/downloads return 503, everything else works. `redis`: sessions fall back to Postgres, limits fail open, queue enqueue returns 503. `queue`: large imports return 503 and revert to `ready`.
 - **Stuck import** — the hourly housekeeping marks imports `committing` >30 min as `failed`; re-run `POST /imports/:id/commit` (per-row keys make it safe).
-- **Dead e-mails** — `select * from email_outbox where status='failed'`; fix the cause (bad address/creds) and set `status='pending', attempts=0`.
+- **Dead e-mails** — `select * from email_outbox where status='failed' and last_error not like 'recipient suppressed%'`; fix the cause (bad creds, provider outage) and set `status='pending', attempts=0`.
+- **Bounced / complaining recipient** — Mailgun's webhook (`POST /v1/webhooks/mailgun`) adds the address to `email_suppressions`; the outbox then marks mail to it `failed` with `last_error = 'recipient suppressed (<reason>)'` and never retries. List with `select * from email_suppressions order by created_at desc;`. Once the mailbox is fixed: `delete from email_suppressions where email = '…';` and resend the invitation/reset. A burst of suppressions raises `StoreKeeperEmailSuppressionSpike`.
+- **Webhook rejected (401)** — wrong `MAILGUN_WEBHOOK_SIGNING_KEY`, a clock more than 5 minutes off, or a replayed request. Mailgun retries failed webhooks, so fix the key and the events catch up.
+- **Restore / point-in-time recovery** — see `RELEASE.md` section 4 (procedure, measured times, and the rule: do not switch traffic until `scripts/verify-integrity.ts` reports 0 violations; run `ANALYZE` after a logical restore).
+- **Demo or staging data** — `npm run seed:demo` (refuses `NODE_ENV=production`; safe to re-run, it does nothing the second time). Organization slug `demo-works`.
 - **Poison domain event** — parked after 8 attempts with `last_error`; fix the cause and `update domain_events set processed_at=null, attempts=0 where id=…`.
 - **Cycle-count reminders look wrong** — they fire once per cycle from `max(last closed shelf count, shelf created) + cycleCountDays`. Check `GET /shelves` (`lastCountedAt`, `nextCountDueAt`); a shelf with no active items, or archived, is never reminded. To re-arm, close a shelf-scope reconciliation or change the interval.
 - **Invite/reset e-mail arrived out of order** — the outbox sends oldest-first (fixed in C1); if two mails exist for one recipient, only the newest link works.

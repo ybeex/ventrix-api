@@ -58,6 +58,8 @@ cp .env.example .env
 npm run db:migrate
 npm run dev                          # API on :3000   (docs at /docs in non-production)
 npm run dev:worker                   # background jobs (second terminal)
+npm run seed:demo                    # demo organization built through the API (org slug demo-works; see scripts/seed-demo.ts for logins)
+npm run check-config -- --connect    # pre-rollout production configuration review (see docs/RELEASE.md)
 npm test                             # needs Postgres + Redis; see docs/OPERATIONS.md
 ```
 
@@ -80,8 +82,9 @@ src/lib/                         errors, pagination, idempotency, permissions, c
 src/plugins/                     perimeter security, auth, access (fail-closed), errors, observability
 src/modules/<name>/              one folder per bounded module: service.ts · routes.ts (· queries.ts · schemas.ts)
 drizzle/                         generated migrations + manual/{pre,post}/ SQL (extensions, immutability triggers)
-test/                            390+ integration tests against real Postgres and Redis
-docs/                            DECISIONS · SECURITY · OPERATIONS · AUDIT-FINDINGS · openapi.json
+test/                            430+ integration tests against real Postgres and Redis
+deploy/                          Prometheus alert rules (promtool-tested) · Grafana dashboard
+docs/                            DECISIONS · SECURITY · OPERATIONS · RELEASE · FRONTEND-INTEGRATION · AUDIT-FINDINGS · openapi.json
 ```
 
 ## Testing

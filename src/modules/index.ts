@@ -24,6 +24,7 @@ import importRoutes from './imports/routes.js';
 import syncRoutes from './sync/routes.js';
 import notificationRoutes from './notifications/routes.js';
 import announcementRoutes from './notifications/announcements.routes.js';
+import mailWebhookRoutes from './mail/webhook.routes.js';
 
 export async function registerModules(app: FastifyInstance): Promise<void> {
   await app.register(async (v1) => {
@@ -47,5 +48,6 @@ export async function registerModules(app: FastifyInstance): Promise<void> {
     await v1.register(syncRoutes);
     await v1.register(notificationRoutes);
     await v1.register(announcementRoutes);
+    await v1.register(mailWebhookRoutes);
   }, { prefix: '/v1' });
 }

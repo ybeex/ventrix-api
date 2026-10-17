@@ -15,6 +15,7 @@ import { emailOutbox } from '../../db/schema.js';
 import { DependencyUnavailableError } from '../../lib/errors.js';
 import { metrics } from '../../lib/metrics.js';
 import { sendMail } from './mailer.js';
+import { isSuppressed } from './suppression.js';
 
 const MAX_ATTEMPTS = 8;
 const CLAIM_VISIBILITY_SECONDS = 120;
@@ -26,7 +27,7 @@ export async function enqueueEmail(
   await tx.insert(emailOutbox).values({ orgId: mail.orgId, toEmail: mail.to, subject: mail.subject, textBody: mail.text, htmlBody: mail.html ?? null });
 }
 
-export interface DispatchResult { sent: number; failed: number; deferred: number }
+export interface DispatchResult { sent: number; failed: number; deferred: number; suppressed: number }
 
 export async function dispatchDueEmails(db: Db, batch = 20): Promise<DispatchResult> {
   // UPDATE … RETURNING does not preserve the subquery's ORDER BY (it follows physical heap order, which churn scrambles), so the
@@ -51,8 +52,16 @@ export async function dispatchDueEmails(db: Db, batch = 20): Promise<DispatchRes
   `);
   const rows = Array.isArray(claimed) ? claimed : (claimed as unknown as { rows: typeof claimed }).rows;
 
-  const result: DispatchResult = { sent: 0, failed: 0, deferred: 0 };
+  const result: DispatchResult = { sent: 0, failed: 0, deferred: 0, suppressed: 0 };
   for (const r of rows) {
+    // A recipient the provider reported as bounced / complaining / unsubscribed is never mailed again — and never retried.
+    const why = await isSuppressed(db, r.to_email);
+    if (why) {
+      await db.update(emailOutbox).set({ status: 'failed', lastError: `recipient suppressed (${why})` }).where(eq(emailOutbox.id, r.id));
+      metrics.emails.inc({ outcome: 'suppressed' });
+      result.suppressed++;
+      continue;
+    }
     try {
       await sendMail({ to: r.to_email, subject: r.subject, text: r.text_body, html: r.html_body ?? undefined });
       await db.update(emailOutbox).set({ status: 'sent', sentAt: new Date(), lastError: null }).where(eq(emailOutbox.id, r.id));

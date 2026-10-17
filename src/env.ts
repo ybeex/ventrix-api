@@ -56,6 +56,8 @@ const EnvSchema = Type.Object({
   MAILGUN_SMTP_PORT: Int(587, 1),
   MAILGUN_SMTP_USER: Type.String({ default: '' }),
   MAILGUN_SMTP_PASS: Type.String({ default: '' }),
+  // HTTP webhook signing key (Mailgun → Sending → Webhooks → HTTP webhook signing key). Empty = the bounce/complaint webhook rejects everything.
+  MAILGUN_WEBHOOK_SIGNING_KEY: Type.String({ default: '' }),
 
   CB_TIMEOUT_MS: Int(8000, 100),
   CB_ERROR_THRESHOLD_PCT: Int(50, 1),
@@ -92,6 +94,7 @@ function loadEnv(): Env {
     if (!e.APP_BASE_URL.startsWith('https://')) problems.push('APP_BASE_URL: must be https:// in production');
     if (!e.FORCE_HTTPS) problems.push('FORCE_HTTPS: must be true in production');
     if (e.MAIL_DRIVER !== 'mailgun') problems.push('MAIL_DRIVER: must be "mailgun" in production');
+    if (e.MAIL_DRIVER === 'mailgun' && e.MAILGUN_WEBHOOK_SIGNING_KEY.length < 16) problems.push('MAILGUN_WEBHOOK_SIGNING_KEY: required (>= 16 chars) so bounces and complaints stop retries');
     if (e.MAIL_DRIVER === 'mailgun' && (!e.MAILGUN_SMTP_USER || !e.MAILGUN_SMTP_PASS)) problems.push('MAILGUN_SMTP_USER/PASS: required');
     if (e.STORAGE_DRIVER !== 's3') problems.push('STORAGE_DRIVER: must be "s3" in production (local disk does not scale across instances)');
     if (e.STORAGE_DRIVER === 's3' && (!e.S3_BUCKET || !e.S3_ACCESS_KEY_ID || !e.S3_SECRET_ACCESS_KEY)) problems.push('S3_BUCKET/S3_ACCESS_KEY_ID/S3_SECRET_ACCESS_KEY: required');
