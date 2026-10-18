@@ -111,12 +111,12 @@ tests:
   - name: an unreachable API instance pages after 2 minutes
     interval: 1m
     input_series:
-      - { series: 'up{job="storekeeper-api",instance="api-1:3000"}', values: '1 1 0 0 0 0' }
-      - { series: 'up{job="storekeeper-api",instance="api-2:3000"}', values: '1 1 1 1 1 1' }
+      - { series: 'up{job="storekeeper-api",instance="api-1:4000"}', values: '1 1 0 0 0 0' }
+      - { series: 'up{job="storekeeper-api",instance="api-2:4000"}', values: '1 1 1 1 1 1' }
     alert_rule_test:
       - { eval_time: 3m, alertname: StoreKeeperApiDown, exp_alerts: [] }
       - eval_time: 5m
         alertname: StoreKeeperApiDown
         exp_alerts:
-          - exp_labels: { severity: page, job: storekeeper-api, instance: "api-1:3000" }
-            exp_annotations: { summary: "StoreKeeper API instance api-1:3000 is not scrapeable", description: "Check /healthz, the container and the load balancer." }
+          - exp_labels: { severity: page, job: storekeeper-api, instance: "api-1:4000" }
+            exp_annotations: { summary: "StoreKeeper API instance api-1:4000 is not scrapeable", description: "Check /healthz, the container and the load balancer." }

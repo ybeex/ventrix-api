@@ -27,7 +27,7 @@ services:
     build: .
     command: ["node", "dist/src/server.js"]
     environment: *env
-    ports: ["3000:3000"]
+    ports: ["4000:4000"]
     depends_on: { migrate: { condition: service_completed_successfully }, redis: { condition: service_healthy } }
   worker:
     profiles: [app]

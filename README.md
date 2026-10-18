@@ -56,7 +56,7 @@ npm ci
 docker compose up -d                 # Postgres 16 + Redis 7
 cp .env.example .env
 npm run db:migrate
-npm run dev                          # API on :3000   (docs at /docs in non-production)
+npm run dev                          # API on :4000   (docs at /docs in non-production)
 npm run dev:worker                   # background jobs (second terminal)
 npm run seed:demo                    # demo organization built through the API (org slug demo-works; see scripts/seed-demo.ts for logins)
 npm run check-config -- --connect    # pre-rollout production configuration review (see docs/RELEASE.md)

@@ -1,5 +1,5 @@
 // Endpoint latency probe (WS5): node scripts/measure-endpoints.mjs  (env: BASE, SLUG, EMAIL, PASSWORD, N)
-const BASE = process.env.BASE ?? 'http://localhost:3000'; const N = Number(process.env.N ?? 15);
+const BASE = process.env.BASE ?? 'http://localhost:4000'; const N = Number(process.env.N ?? 15);
 const slug = process.env.SLUG ?? 'load-big'; const email = process.env.EMAIL ?? `admin@${slug}.test`; const password = process.env.PASSWORD ?? 'Load-Test-Password-42';
 const login = await fetch(`${BASE}/v1/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ orgSlug: slug, email, password }) });
 const { token } = await login.json(); const h = { authorization: `Bearer ${token}` };

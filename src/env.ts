@@ -11,7 +11,7 @@ const Int = (def: number, min = 0) => Type.Integer({ default: def, minimum: min 
 
 const EnvSchema = Type.Object({
   NODE_ENV: Type.Union([Type.Literal('development'), Type.Literal('test'), Type.Literal('production')], { default: 'development' }),
-  PORT: Int(3000, 1),
+  PORT: Int(4000, 1),
   HOST: Type.String({ default: '0.0.0.0' }),
   LOG_LEVEL: Type.String({ default: 'info' }),
   APP_BASE_URL: Type.String({ default: 'http://localhost:5173' }),
