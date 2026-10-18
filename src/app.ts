@@ -49,6 +49,40 @@ export async function buildApp() {
     return payload;
   });
 
+  if (env.NODE_ENV !== 'production') {
+    // API docs are a development aid. They are dev-only DEPENDENCIES loaded dynamically, so the production image
+    // (npm ci --omit=dev) does not even contain the swagger UI / static file server — nothing to attack.
+    const [{ default: swagger }, { default: swaggerUi }] = await Promise.all([import('@fastify/swagger'), import('@fastify/swagger-ui')]);
+    await app.register(swagger, {
+      openapi: {
+        info: { title: 'StoreKeeper API', version: '1.0.0', description: 'Transaction & accountability backend (PRD v3)' },
+        tags: [
+          'System', 'Authentication', 'Users', 'Organization', 'Locations', 'Holders', 'Jobs', 'Shelves',
+          'Categories', 'Files', 'Items', 'Transactions', 'Approvals', 'Operations', 'Activity', 'Reports',
+          'Reconciliation', 'Imports', 'Sync', 'Notifications', 'Announcements', 'Webhooks',
+        ].map((name) => ({ name })),
+        components: { securitySchemes: { bearer: { type: 'http', scheme: 'bearer' } } },
+        security: [{ bearer: [] }],
+      },
+      transform: ({ schema, url }) => {
+        const path = url.startsWith('/v1/') ? url.slice(4) : url;
+        const section = path.split('/').filter(Boolean)[0] ?? 'system';
+        const tagBySection: Record<string, string> = {
+          auth: 'Authentication', users: 'Users', organization: 'Organization', locations: 'Locations',
+          holders: 'Holders', jobs: 'Jobs', shelves: 'Shelves', categories: 'Categories', files: 'Files',
+          items: 'Items', transactions: 'Transactions', approvals: 'Approvals', activity: 'Activity',
+          reports: 'Reports', reconciliations: 'Reconciliation', imports: 'Imports', sync: 'Sync',
+          notifications: 'Notifications', announcements: 'Announcements', webhooks: 'Webhooks',
+          collections: 'Operations', outstanding: 'Operations', overdue: 'Operations',
+          'low-stock': 'Operations', dashboard: 'Operations',
+        };
+        const routeSchema = schema ?? {};
+        return { schema: { ...routeSchema, tags: routeSchema.tags?.length ? routeSchema.tags : [tagBySection[section] ?? 'System'] }, url };
+      },
+    });
+    await app.register(swaggerUi, { routePrefix: '/docs' });
+  }
+
   // Order matters: stores → perimeter → errors → auth/access → idempotency → routes.
   await app.register(dbPlugin);
   await app.register(redisPlugin);
@@ -58,20 +92,6 @@ export async function buildApp() {
   await app.register(accessPlugin); // before ANY route is registered (infra routes included), so the registry/fail-closed check sees them all
   await app.register(observabilityPlugin);
   await app.register(idempotencyPlugin);
-
-  if (env.NODE_ENV !== 'production') {
-    // API docs are a development aid. They are dev-only DEPENDENCIES loaded dynamically, so the production image
-    // (npm ci --omit=dev) does not even contain the swagger UI / static file server — nothing to attack.
-    const [{ default: swagger }, { default: swaggerUi }] = await Promise.all([import('@fastify/swagger'), import('@fastify/swagger-ui')]);
-    await app.register(swagger, {
-      openapi: {
-        info: { title: 'StoreKeeper API', version: '1.0.0', description: 'Transaction & accountability backend (PRD v3)' },
-        components: { securitySchemes: { bearer: { type: 'http', scheme: 'bearer' } } },
-        security: [{ bearer: [] }],
-      },
-    });
-    await app.register(swaggerUi, { routePrefix: '/docs' });
-  }
 
   await registerModules(app);
   return app;

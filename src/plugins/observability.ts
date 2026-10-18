@@ -21,9 +21,45 @@ export default fp(async function observabilityPlugin(app: FastifyInstance) {
     metrics.httpDuration.observe({ method: req.method, route, status: String(reply.statusCode) }, reply.elapsedTime / 1000);
   });
 
-  app.get('/healthz', { config: { public: true, rateLimit: false }, logLevel: 'warn' }, async () => ({ status: 'ok' }));
+  const livenessSchema = {
+    response: {
+      200: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['status'],
+        properties: { status: { type: 'string', enum: ['ok'] } },
+      },
+    },
+  } as const;
+  const livenessHandler = async () => ({ status: 'ok' as const });
+  const livenessOptions = { schema: livenessSchema, config: { public: true, rateLimit: false }, logLevel: 'warn' as const };
 
-  app.get('/readyz', { config: { public: true, rateLimit: false }, logLevel: 'warn' }, async (_req, reply) => {
+  // Keep conventional probe paths alongside /healthz for existing deployments.
+  app.get('/health', livenessOptions, livenessHandler);
+  app.get('/live', livenessOptions, livenessHandler);
+  app.get('/healthz', livenessOptions, livenessHandler);
+
+  const readinessSchema = {
+    response: {
+      200: {
+        type: 'object', additionalProperties: false, required: ['status', 'db', 'redis', 'breakers'],
+        properties: {
+          status: { type: 'string', enum: ['ready', 'degraded'] },
+          db: { type: 'boolean' }, redis: { type: 'boolean' },
+          breakers: { type: 'object', additionalProperties: { type: 'string', enum: ['closed', 'half-open', 'open'] } },
+        },
+      },
+      503: {
+        type: 'object', additionalProperties: false, required: ['status', 'db', 'redis', 'breakers'],
+        properties: {
+          status: { type: 'string', enum: ['unavailable'] },
+          db: { type: 'boolean' }, redis: { type: 'boolean' },
+          breakers: { type: 'object', additionalProperties: { type: 'string', enum: ['closed', 'half-open', 'open'] } },
+        },
+      },
+    },
+  } as const;
+  app.get('/readyz', { schema: readinessSchema, config: { public: true, rateLimit: false }, logLevel: 'warn' }, async (_req, reply) => {
     let db = true;
     let redis = true;
     try { await pingDb(); } catch { db = false; }

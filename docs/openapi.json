@@ -15,6 +15,205 @@
     "schemas": {}
   },
   "paths": {
+    "/health": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "status"
+                  ],
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "ok"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "System"
+        ]
+      }
+    },
+    "/live": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "status"
+                  ],
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "ok"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "System"
+        ]
+      }
+    },
+    "/healthz": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "status"
+                  ],
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "ok"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "System"
+        ]
+      }
+    },
+    "/readyz": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "status",
+                    "db",
+                    "redis",
+                    "breakers"
+                  ],
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "ready",
+                        "degraded"
+                      ]
+                    },
+                    "db": {
+                      "type": "boolean"
+                    },
+                    "redis": {
+                      "type": "boolean"
+                    },
+                    "breakers": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string",
+                        "enum": [
+                          "closed",
+                          "half-open",
+                          "open"
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "status",
+                    "db",
+                    "redis",
+                    "breakers"
+                  ],
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "unavailable"
+                      ]
+                    },
+                    "db": {
+                      "type": "boolean"
+                    },
+                    "redis": {
+                      "type": "boolean"
+                    },
+                    "breakers": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string",
+                        "enum": [
+                          "closed",
+                          "half-open",
+                          "open"
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "System"
+        ]
+      }
+    },
+    "/metrics": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        },
+        "tags": [
+          "System"
+        ]
+      }
+    },
     "/v1/auth/register-org": {
       "post": {
         "requestBody": {
@@ -183,7 +382,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Authentication"
+        ]
       }
     },
     "/v1/auth/login": {
@@ -308,7 +510,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Authentication"
+        ]
       }
     },
     "/v1/auth/accept-invite": {
@@ -423,7 +628,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Authentication"
+        ]
       }
     },
     "/v1/auth/password-reset/request": {
@@ -479,7 +687,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Authentication"
+        ]
       }
     },
     "/v1/auth/password-reset/confirm": {
@@ -515,7 +726,10 @@
           "204": {
             "description": "Default Response"
           }
-        }
+        },
+        "tags": [
+          "Authentication"
+        ]
       }
     },
     "/v1/auth/logout": {
@@ -524,7 +738,10 @@
           "204": {
             "description": "Default Response"
           }
-        }
+        },
+        "tags": [
+          "Authentication"
+        ]
       }
     },
     "/v1/auth/logout-all": {
@@ -533,7 +750,10 @@
           "204": {
             "description": "Default Response"
           }
-        }
+        },
+        "tags": [
+          "Authentication"
+        ]
       }
     },
     "/v1/auth/me": {
@@ -663,7 +883,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Authentication"
+        ]
       }
     },
     "/v1/auth/sessions": {
@@ -751,7 +974,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Authentication"
+        ]
       }
     },
     "/v1/auth/sessions/{id}": {
@@ -771,7 +997,10 @@
           "204": {
             "description": "Default Response"
           }
-        }
+        },
+        "tags": [
+          "Authentication"
+        ]
       }
     },
     "/v1/auth/pin": {
@@ -806,14 +1035,20 @@
           "204": {
             "description": "Default Response"
           }
-        }
+        },
+        "tags": [
+          "Authentication"
+        ]
       },
       "delete": {
         "responses": {
           "204": {
             "description": "Default Response"
           }
-        }
+        },
+        "tags": [
+          "Authentication"
+        ]
       }
     },
     "/v1/auth/pin-users": {
@@ -855,7 +1090,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Authentication"
+        ]
       }
     },
     "/v1/auth/pin-switch": {
@@ -962,7 +1200,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Authentication"
+        ]
       }
     },
     "/v1/users": {
@@ -1128,7 +1369,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Users"
+        ]
       }
     },
     "/v1/users/invitations": {
@@ -1270,7 +1514,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Users"
+        ]
       },
       "get": {
         "parameters": [
@@ -1449,7 +1696,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Users"
+        ]
       }
     },
     "/v1/users/invitations/bulk": {
@@ -1590,7 +1840,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Users"
+        ]
       }
     },
     "/v1/users/{id}/invitations/resend": {
@@ -1610,7 +1863,10 @@
           "204": {
             "description": "Default Response"
           }
-        }
+        },
+        "tags": [
+          "Users"
+        ]
       }
     },
     "/v1/users/{id}/invitations/revoke": {
@@ -1630,7 +1886,10 @@
           "204": {
             "description": "Default Response"
           }
-        }
+        },
+        "tags": [
+          "Users"
+        ]
       }
     },
     "/v1/users/{id}": {
@@ -1773,7 +2032,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Users"
+        ]
       }
     },
     "/v1/users/{id}/sessions": {
@@ -1856,7 +2118,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Users"
+        ]
       },
       "delete": {
         "parameters": [
@@ -1890,7 +2155,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Users"
+        ]
       }
     },
     "/v1/users/{id}/pin": {
@@ -1910,7 +2178,10 @@
           "204": {
             "description": "Default Response"
           }
-        }
+        },
+        "tags": [
+          "Users"
+        ]
       }
     },
     "/v1/organization": {
@@ -1953,7 +2224,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Organization"
+        ]
       },
       "patch": {
         "requestBody": {
@@ -2017,7 +2291,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Organization"
+        ]
       }
     },
     "/v1/organization/settings": {
@@ -2072,7 +2349,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Organization"
+        ]
       },
       "patch": {
         "requestBody": {
@@ -2252,7 +2532,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Organization"
+        ]
       }
     },
     "/v1/organization/approval-policy": {
@@ -2393,7 +2676,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Organization"
+        ]
       },
       "put": {
         "requestBody": {
@@ -2667,7 +2953,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Organization"
+        ]
       }
     },
     "/v1/locations": {
@@ -2764,7 +3053,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Locations"
+        ]
       },
       "post": {
         "requestBody": {
@@ -2904,7 +3196,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Locations"
+        ]
       }
     },
     "/v1/locations/{id}": {
@@ -3024,7 +3319,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Locations"
+        ]
       }
     },
     "/v1/locations/{id}/archive": {
@@ -3044,7 +3342,10 @@
           "204": {
             "description": "Default Response"
           }
-        }
+        },
+        "tags": [
+          "Locations"
+        ]
       }
     },
     "/v1/holders/recent": {
@@ -3139,7 +3440,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Holders"
+        ]
       }
     },
     "/v1/holders": {
@@ -3327,7 +3631,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Holders"
+        ]
       },
       "post": {
         "requestBody": {
@@ -3482,7 +3789,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Holders"
+        ]
       }
     },
     "/v1/holders/{id}": {
@@ -3586,7 +3896,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Holders"
+        ]
       },
       "patch": {
         "requestBody": {
@@ -3712,7 +4025,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Holders"
+        ]
       }
     },
     "/v1/holders/{id}/archive": {
@@ -3732,7 +4048,10 @@
           "204": {
             "description": "Default Response"
           }
-        }
+        },
+        "tags": [
+          "Holders"
+        ]
       }
     },
     "/v1/holders/{id}/members": {
@@ -3785,7 +4104,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Holders"
+        ]
       },
       "put": {
         "requestBody": {
@@ -3847,7 +4169,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Holders"
+        ]
       }
     },
     "/v1/jobs": {
@@ -3987,7 +4312,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Jobs"
+        ]
       },
       "post": {
         "requestBody": {
@@ -4074,7 +4402,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Jobs"
+        ]
       }
     },
     "/v1/jobs/{id}": {
@@ -4189,7 +4520,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Jobs"
+        ]
       }
     },
     "/v1/jobs/{id}/archive": {
@@ -4209,7 +4543,10 @@
           "204": {
             "description": "Default Response"
           }
-        }
+        },
+        "tags": [
+          "Jobs"
+        ]
       }
     },
     "/v1/shelves": {
@@ -4324,7 +4661,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Shelves"
+        ]
       },
       "post": {
         "requestBody": {
@@ -4452,7 +4792,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Shelves"
+        ]
       }
     },
     "/v1/shelves/lookup": {
@@ -4548,7 +4891,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Shelves"
+        ]
       }
     },
     "/v1/shelves/{id}": {
@@ -4643,7 +4989,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Shelves"
+        ]
       },
       "patch": {
         "requestBody": {
@@ -4781,7 +5130,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Shelves"
+        ]
       }
     },
     "/v1/shelves/{id}/archive": {
@@ -4801,7 +5153,10 @@
           "204": {
             "description": "Default Response"
           }
-        }
+        },
+        "tags": [
+          "Shelves"
+        ]
       }
     },
     "/v1/shelves/{id}/restore": {
@@ -4896,7 +5251,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Shelves"
+        ]
       }
     },
     "/v1/shelves/{id}/qr": {
@@ -4937,7 +5295,10 @@
           "200": {
             "description": "Default Response"
           }
-        }
+        },
+        "tags": [
+          "Shelves"
+        ]
       }
     },
     "/v1/categories": {
@@ -5037,7 +5398,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Categories"
+        ]
       },
       "post": {
         "requestBody": {
@@ -5147,7 +5511,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Categories"
+        ]
       }
     },
     "/v1/categories/{id}": {
@@ -5227,7 +5594,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Categories"
+        ]
       },
       "patch": {
         "requestBody": {
@@ -5341,7 +5711,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Categories"
+        ]
       }
     },
     "/v1/categories/{id}/move": {
@@ -5454,7 +5827,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Categories"
+        ]
       }
     },
     "/v1/categories/{id}/archive": {
@@ -5474,7 +5850,10 @@
           "204": {
             "description": "Default Response"
           }
-        }
+        },
+        "tags": [
+          "Categories"
+        ]
       }
     },
     "/v1/categories/{id}/restore": {
@@ -5554,7 +5933,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Categories"
+        ]
       }
     },
     "/v1/files": {
@@ -5633,7 +6015,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Files"
+        ]
       }
     },
     "/v1/files/{id}": {
@@ -5718,7 +6103,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Files"
+        ]
       }
     },
     "/v1/files/{id}/content": {
@@ -5756,7 +6144,10 @@
           "200": {
             "description": "Default Response"
           }
-        }
+        },
+        "tags": [
+          "Files"
+        ]
       }
     },
     "/v1/items": {
@@ -6254,7 +6645,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Items"
+        ]
       },
       "post": {
         "requestBody": {
@@ -6959,7 +7353,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Items"
+        ]
       }
     },
     "/v1/items/lookup": {
@@ -7284,7 +7681,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Items"
+        ]
       }
     },
     "/v1/items/recent": {
@@ -7622,7 +8022,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Items"
+        ]
       }
     },
     "/v1/items/{id}": {
@@ -7946,7 +8349,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Items"
+        ]
       },
       "patch": {
         "requestBody": {
@@ -8332,7 +8738,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Items"
+        ]
       }
     },
     "/v1/items/move": {
@@ -8391,7 +8800,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Items"
+        ]
       }
     },
     "/v1/items/{id}/move": {
@@ -8735,7 +9147,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Items"
+        ]
       }
     },
     "/v1/items/{id}/archive": {
@@ -9077,7 +9492,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Items"
+        ]
       }
     },
     "/v1/items/{id}/restore": {
@@ -9419,7 +9837,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Items"
+        ]
       }
     },
     "/v1/items/{id}/timeline": {
@@ -9944,7 +10365,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Items"
+        ]
       }
     },
     "/v1/items/{id}/qr": {
@@ -9985,7 +10409,10 @@
           "200": {
             "description": "Default Response"
           }
-        }
+        },
+        "tags": [
+          "Items"
+        ]
       }
     },
     "/v1/transactions/checkout": {
@@ -12156,7 +12583,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Transactions"
+        ]
       }
     },
     "/v1/transactions/checkout/batch": {
@@ -14338,7 +14768,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Transactions"
+        ]
       }
     },
     "/v1/transactions/checkin": {
@@ -16527,7 +16960,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Transactions"
+        ]
       }
     },
     "/v1/transactions/consume": {
@@ -18691,7 +19127,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Transactions"
+        ]
       }
     },
     "/v1/transactions/restock": {
@@ -20847,7 +21286,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Transactions"
+        ]
       }
     },
     "/v1/transactions/adjust": {
@@ -23039,7 +23481,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Transactions"
+        ]
       }
     },
     "/v1/transactions/loss": {
@@ -25198,7 +25643,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Transactions"
+        ]
       }
     },
     "/v1/transactions/damage": {
@@ -27357,7 +27805,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Transactions"
+        ]
       }
     },
     "/v1/transactions/condition": {
@@ -29555,7 +30006,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Transactions"
+        ]
       }
     },
     "/v1/transactions/{id}/correct": {
@@ -31832,7 +32286,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Transactions"
+        ]
       }
     },
     "/v1/transactions": {
@@ -32489,7 +32946,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Transactions"
+        ]
       }
     },
     "/v1/transactions/{id}": {
@@ -32978,7 +33438,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Transactions"
+        ]
       }
     },
     "/v1/approvals": {
@@ -33276,7 +33739,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Approvals"
+        ]
       }
     },
     "/v1/approvals/{id}": {
@@ -33469,7 +33935,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Approvals"
+        ]
       }
     },
     "/v1/approvals/{id}/approve": {
@@ -34158,7 +34627,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Approvals"
+        ]
       }
     },
     "/v1/approvals/{id}/reject": {
@@ -34372,7 +34844,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Approvals"
+        ]
       }
     },
     "/v1/approvals/{id}/cancel": {
@@ -34565,7 +35040,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Approvals"
+        ]
       }
     },
     "/v1/collections": {
@@ -34848,7 +35326,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Operations"
+        ]
       }
     },
     "/v1/outstanding": {
@@ -35094,7 +35575,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Operations"
+        ]
       }
     },
     "/v1/overdue": {
@@ -35301,7 +35785,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Operations"
+        ]
       }
     },
     "/v1/low-stock": {
@@ -35452,7 +35939,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Operations"
+        ]
       }
     },
     "/v1/dashboard": {
@@ -35522,7 +36012,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Operations"
+        ]
       }
     },
     "/v1/activity/actions": {
@@ -35574,7 +36067,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Activity"
+        ]
       }
     },
     "/v1/activity": {
@@ -35815,7 +36311,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Activity"
+        ]
       }
     },
     "/v1/reports": {
@@ -35880,7 +36379,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Reports"
+        ]
       }
     },
     "/v1/reports/{name}": {
@@ -36192,7 +36694,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Reports"
+        ]
       }
     },
     "/v1/reconciliations": {
@@ -36350,7 +36855,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Reconciliation"
+        ]
       },
       "get": {
         "parameters": [
@@ -36511,7 +37019,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Reconciliation"
+        ]
       }
     },
     "/v1/reconciliations/{id}": {
@@ -36797,7 +37308,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Reconciliation"
+        ]
       }
     },
     "/v1/reconciliations/{id}/expected": {
@@ -36908,7 +37422,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Reconciliation"
+        ]
       }
     },
     "/v1/reconciliations/{id}/counts": {
@@ -38530,7 +39047,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Reconciliation"
+        ]
       }
     },
     "/v1/reconciliations/{id}/close": {
@@ -38663,7 +39183,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Reconciliation"
+        ]
       }
     },
     "/v1/imports": {
@@ -38792,7 +39315,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Imports"
+        ]
       },
       "get": {
         "responses": {
@@ -38898,7 +39424,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Imports"
+        ]
       }
     },
     "/v1/imports/{id}": {
@@ -39067,7 +39596,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Imports"
+        ]
       }
     },
     "/v1/imports/{id}/validate": {
@@ -39376,7 +39908,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Imports"
+        ]
       }
     },
     "/v1/imports/{id}/commit": {
@@ -39632,7 +40167,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Imports"
+        ]
       }
     },
     "/v1/imports/{id}/errors": {
@@ -39652,7 +40190,10 @@
           "200": {
             "description": "Default Response"
           }
-        }
+        },
+        "tags": [
+          "Imports"
+        ]
       }
     },
     "/v1/sync/batch": {
@@ -39802,7 +40343,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Sync"
+        ]
       }
     },
     "/v1/sync/conflicts": {
@@ -40003,7 +40547,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Sync"
+        ]
       }
     },
     "/v1/sync/conflicts/{id}/resolve": {
@@ -40193,7 +40740,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Sync"
+        ]
       }
     },
     "/v1/sync/snapshot/items": {
@@ -40563,7 +41113,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Sync"
+        ]
       }
     },
     "/v1/sync/snapshot/holders": {
@@ -40713,7 +41266,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Sync"
+        ]
       }
     },
     "/v1/sync/snapshot/reference": {
@@ -40727,7 +41283,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Sync"
+        ]
       }
     },
     "/v1/notifications": {
@@ -40879,7 +41438,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Notifications"
+        ]
       }
     },
     "/v1/notifications/unread-count": {
@@ -40904,7 +41466,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Notifications"
+        ]
       }
     },
     "/v1/notifications/read-all": {
@@ -40929,7 +41494,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Notifications"
+        ]
       }
     },
     "/v1/notifications/{id}/read": {
@@ -40949,7 +41517,10 @@
           "204": {
             "description": "Default Response"
           }
-        }
+        },
+        "tags": [
+          "Notifications"
+        ]
       }
     },
     "/v1/notifications/preferences": {
@@ -41047,7 +41618,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Notifications"
+        ]
       }
     },
     "/v1/notifications/preferences/{type}": {
@@ -41136,7 +41710,10 @@
           "204": {
             "description": "Default Response"
           }
-        }
+        },
+        "tags": [
+          "Notifications"
+        ]
       }
     },
     "/v1/announcements": {
@@ -41295,7 +41872,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Announcements"
+        ]
       },
       "post": {
         "requestBody": {
@@ -41518,7 +42098,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Announcements"
+        ]
       }
     },
     "/v1/announcements/{id}": {
@@ -41717,7 +42300,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Announcements"
+        ]
       }
     },
     "/v1/announcements/{id}/retract": {
@@ -41737,7 +42323,10 @@
           "204": {
             "description": "Default Response"
           }
-        }
+        },
+        "tags": [
+          "Announcements"
+        ]
       }
     },
     "/v1/organization/notification-rules": {
@@ -41785,7 +42374,10 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Organization"
+        ]
       }
     },
     "/v1/organization/notification-rules/{type}": {
@@ -41854,7 +42446,10 @@
           "204": {
             "description": "Default Response"
           }
-        }
+        },
+        "tags": [
+          "Organization"
+        ]
       }
     },
     "/v1/webhooks/mailgun": {
@@ -41960,13 +42555,84 @@
               }
             }
           }
-        }
+        },
+        "tags": [
+          "Webhooks"
+        ]
       }
     }
   },
   "security": [
     {
       "bearer": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "System"
+    },
+    {
+      "name": "Authentication"
+    },
+    {
+      "name": "Users"
+    },
+    {
+      "name": "Organization"
+    },
+    {
+      "name": "Locations"
+    },
+    {
+      "name": "Holders"
+    },
+    {
+      "name": "Jobs"
+    },
+    {
+      "name": "Shelves"
+    },
+    {
+      "name": "Categories"
+    },
+    {
+      "name": "Files"
+    },
+    {
+      "name": "Items"
+    },
+    {
+      "name": "Transactions"
+    },
+    {
+      "name": "Approvals"
+    },
+    {
+      "name": "Operations"
+    },
+    {
+      "name": "Activity"
+    },
+    {
+      "name": "Reports"
+    },
+    {
+      "name": "Reconciliation"
+    },
+    {
+      "name": "Imports"
+    },
+    {
+      "name": "Sync"
+    },
+    {
+      "name": "Notifications"
+    },
+    {
+      "name": "Announcements"
+    },
+    {
+      "name": "Webhooks"
     }
   ]
 }
